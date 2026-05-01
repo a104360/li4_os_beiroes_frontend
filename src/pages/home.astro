@@ -1,0 +1,30 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Os Beirões - Home" showNav={true} activeNav="home">
+  <div class="view active">
+    <h2 class="bebas mb-4" style="font-size:32px;">Olá, <span id="homeUserName"></span>! 👋</h2>
+    
+    <div id="homeJogoBanner" class="banner-jogo hidden">
+      <span>🔥</span> JOGO HOJE <span>🔥</span>
+    </div>
+
+    <div class="d-flex justify-between align-center mb-2 mt-4">
+      <h3 class="bebas text-muted" style="font-size:20px;">EVENTOS DE HOJE</h3>
+    </div>
+    <div id="homeEventosContainer"></div>
+
+    <div class="d-flex justify-between align-center mb-2 mt-4">
+      <h3 class="bebas text-muted" style="font-size:20px;">ÚLTIMOS COMUNICADOS</h3>
+      <a href="#" onclick="navigate(\'comunicados\')" style="font-size:14px;color:var(--color-primary);font-weight:600;text-decoration:none;">Ver todos →</a>
+    </div>
+    <div id="homeComunicadosContainer"></div>
+
+    <div id="homeQuickActions" class="mt-4 hidden" style="display:flex;gap:12px;">
+      <button class="btn btn-secondary" onclick="openModal('modalComunicado')" style="flex:1;font-size:14px;height:40px;min-height:40px;">+ Comunicado</button>
+      <button class="btn btn-secondary" onclick="openModal('modalEvento')" style="flex:1;font-size:14px;height:40px;min-height:40px;">+ Evento</button>
+    </div>
+    
+  </div>
+</Layout>

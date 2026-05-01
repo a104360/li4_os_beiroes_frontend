@@ -62,11 +62,31 @@ async function fakeNetworkDelay() {
   return new Promise(r => setTimeout(r, 400 + Math.random()*400));
 }
 
-/* API MOCK */
+/* API CALL */
 async function apiCall(method, endpoint, body) {
-  await fakeNetworkDelay();
-  // We simulate API 404s and fallback to AppState mock data
-  return null; // Force fallback locally
+  try {
+    const res = await fetch(`https://api.osbeiroes.cc${endpoint}`, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(AppState.user?.token && { 'Authorization': `Bearer ${AppState.user.token}` })
+      },
+      body: body ? JSON.stringify(body) : null
+    });
+    if (res.status === 403) { showToast('Não tens permissão para esta ação.', 'error'); throw new Error('403'); }
+    if (res.status === 400) { const e = await res.json(); showToast(e.message || 'Dados inválidos.', 'error'); throw new Error('400'); }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    
+    const text = await res.text();
+    try {
+      return text ? JSON.parse(text) : true;
+    } catch(e) {
+      return text;
+    }
+  } catch (err) {
+    console.warn(`API falhou (${endpoint}), a usar fallback local.`);
+    return null;
+  }
 }
 
 /* AUTH */
@@ -75,19 +95,30 @@ function fillLogin(c, p) { $('loginContacto').value=c; $('loginPassword').value=
 async function handleLogin(e) {
   e.preventDefault();
   $('fullLoader').classList.remove('hidden');
-  await fakeNetworkDelay();
   
   const c = $('loginContacto').value;
   const p = $('loginPassword').value;
-  const u = AppState.users.find(x => x.contacto === c && x.password === p);
   
+  const res = await apiCall('POST', '/auth/login', { contacto: c, password: p });
   $('fullLoader').classList.add('hidden');
-  if(u) {
+  
+  if (res) {
+    let u = AppState.users.find(x => x.contacto === c);
+    if (!u) u = { id: 'u0', nome: 'Utilizador', contacto: c, role: 'jogador' };
+    u.token = typeof res === 'string' ? res : (res.token || 'tok_1');
     AppState.user = u;
     navigate('home');
     showToast('Sessão iniciada com sucesso.');
   } else {
-    showToast('Credenciais incorretas, tenta novamente.', 'error');
+    // Fallback Mock
+    const u = AppState.users.find(x => x.contacto === c && x.password === p);
+    if(u) {
+      AppState.user = u;
+      navigate('home');
+      showToast('Sessão iniciada (Modo Offline).');
+    } else {
+      showToast('Credenciais incorretas, tenta novamente.', 'error');
+    }
   }
 }
 async function handleRegister(e) {
@@ -96,21 +127,28 @@ async function handleRegister(e) {
     showToast('As passwords não coincidem.', 'error'); return;
   }
   $('fullLoader').classList.remove('hidden');
-  await fakeNetworkDelay();
   
-  const newUser = {
-    id: 'u' + Date.now(),
+  const body = {
     nome: $('regNome').value,
     contacto: $('regContacto').value,
     password: $('regPassword').value,
-    role: $('regRole').value,
-    token: 'tok_new'
+    role: $('regRole').value
+  };
+  const res = await apiCall('POST', '/auth/register', body);
+  
+  $('fullLoader').classList.add('hidden');
+  
+  const newUser = {
+    id: 'u' + Date.now(),
+    nome: body.nome,
+    contacto: body.contacto,
+    role: body.role,
+    token: res ? (typeof res === 'string' ? res : res.token) : 'tok_new'
   };
   AppState.users.push(newUser);
   AppState.user = newUser;
-  $('fullLoader').classList.add('hidden');
   navigate('home');
-  showToast('Conta criada com sucesso.');
+  showToast(res ? 'Conta criada com sucesso.' : 'Conta criada (Modo Offline).');
 }
 function handleLogout() {
   AppState.user = null;
@@ -118,22 +156,61 @@ function handleLogout() {
 }
 
 /* NAVIGATION & RENDERING */
-function navigate(view) {
-  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  
-  $('view-' + view).classList.add('active');
-  if(view !== 'login' && view !== 'register') {
-    show('appHeader'); show('bottomNav');
-    const navItem = $('nav-'+view);
-    if(navItem) navItem.classList.add('active');
-  } else {
-    hide('appHeader'); hide('bottomNav');
-  }
-  AppState.currentView = view;
-  window.scrollTo(0,0);
-  renderView(view);
+
+// Load modals once
+let modalsLoaded = false;
+async function loadModals() {
+  if (modalsLoaded) return;
+  try {
+    const res = await fetch('views/modals.html');
+    const html = await res.text();
+    $('modalsContainer').innerHTML = html;
+    modalsLoaded = true;
+  } catch(e) { console.error('Erro ao carregar modals', e); }
 }
+
+
+// Load state from local storage on init if present
+const saved = localStorage.getItem('osbeiroes_state');
+if (saved) {
+    Object.assign(AppState, JSON.parse(saved));
+}
+
+// Save state on unload
+window.addEventListener('beforeunload', () => {
+    localStorage.setItem('osbeiroes_state', JSON.stringify(AppState));
+});
+
+// Since Astro ViewTransitions preserves the window, we also save state aggressively after API calls:
+function saveState() {
+    localStorage.setItem('osbeiroes_state', JSON.stringify(AppState));
+}
+
+window.navigate = function(view) {
+  saveState();
+  const target = view === 'login' ? '/' : '/' + view;
+  window.location.href = target; // Use client router navigation indirectly
+};
+
+async function loadModals() {}
+
+// Wrap renderViews to ensure state runs 
+const _origRenderView = renderView;
+window.renderView = function(view) {
+  saveState();
+  try {
+    _origRenderView(view);
+  } catch(e) { console.warn("View render ignored because element not found (Astro handled it).") }
+};
+
+
+// Auto Login handler
+async function handleAutoLogin() {
+  $('loginContacto').value = '910000001'; // Default to Presidente Quim
+  $('loginPassword').value = 'quim123';
+  await handleLogin(new Event('submit'));
+}
+
 
 function renderView(view) {
   if(view==='home') renderHome();
@@ -301,9 +378,22 @@ function setEventoTipo(tipo) {
   $('btnTipoJogo').className = tipo==='Jogo' ? 'btn btn-primary' : 'btn btn-secondary';
   if(tipo==='Jogo') show('fgAdversario'); else hide('fgAdversario');
 }
-function handleSaveEvento(e) {
+async function handleSaveEvento(e) {
   e.preventDefault();
   const id = $('evId').value || 'e'+Date.now();
+  const body = {
+    tipo: $('evTipo').value,
+    data: $('evData').value,
+    hora: $('evHora').value,
+    local: $('evLocal').value,
+    status: $('evStatus').value,
+    adversario: $('evTipo').value==='Jogo' ? $('evAdversario').value : undefined
+  };
+  const isEdit = !!$('evId').value;
+  const endpoint = isEdit ? `/api/eventos/${$('evId').value}` : '/api/eventos';
+  const method = isEdit ? 'PUT' : 'POST';
+  await apiCall(method, endpoint, body);
+  
   const ev = {
     id,
     tipo: $('evTipo').value,
@@ -546,8 +636,15 @@ function closeModal(id) {
 }
 
 /* COMUNICADO ACTIONS */
-function handleSaveComunicado(e) {
+async function handleSaveComunicado(e) {
   e.preventDefault();
+  const body = {
+    categoria: $('comCategoria').value,
+    titulo: $('comTitulo').value,
+    corpo: $('comCorpo').value
+  };
+  await apiCall('POST', '/api/comunicados', body);
+
   AppState.comunicados.push({
     id: 'c'+Date.now(),
     categoria: $('comCategoria').value,
@@ -562,9 +659,22 @@ function handleSaveComunicado(e) {
 }
 
 /* JOGADOR ACTIONS */
-function handleSaveJogador(e) {
+async function handleSaveJogador(e) {
   e.preventDefault();
   const id = $('jogId').value || 'j'+Date.now();
+  const body = {
+    nome: $('jogNome').value,
+    dataNascimento: $('jogNascimento').value,
+    posicao: $('jogPosicao').value,
+    contacto: $('jogContacto').value,
+    nomeEmergencia: $('jogNomeEmergencia').value,
+    contactoEmergencia: $('jogContactoEmergencia').value
+  };
+  const isEdit = !!$('jogId').value;
+  const endpoint = isEdit ? `/api/jogadores/jogador/${$('jogId').value}` : '/api/jogadores/jogador';
+  const method = isEdit ? 'PUT' : 'POST';
+  await apiCall(method, endpoint, body);
+  
   const j = {
     id,
     nome: $('jogNome').value,
@@ -584,9 +694,10 @@ function handleSaveJogador(e) {
   renderPlantel();
   showToast('Jogador guardado!');
 }
-function handleInactivateJogador() {
+async function handleInactivateJogador() {
   const id = $('jogId').value;
   if(confirm("Tens a certeza que queres inativar este jogador?")) {
+    await apiCall('DELETE', `/api/jogadores/jogador/${id}`);
     const j = AppState.jogadores.find(x=>x.id===id);
     if(j) j.ativo = false;
     closeModal('modalJogador');
@@ -657,7 +768,9 @@ function openModalPresencas(eventoId) {
   $('presencasList').innerHTML = html;
   openModal('modalPresencas');
 }
-function handleSavePresencas() {
+async function handleSavePresencas() {
+  const presencas = Array.from(document.querySelectorAll('.presenca-chk')).map(c => ({ jogadorId: c.value, presente: c.checked }));
+  await apiCall('POST', `/api/eventos/treinos/${AppState.selectedEvent}/presencas`, { presencas });
   closeModal('modalPresencas');
   showToast('Presenças guardadas!');
 }
@@ -683,10 +796,11 @@ function openModalConvocatoria(jogoId) {
   $('convJogadoresList').innerHTML = html;
   openModal('modalConvocatoria');
 }
-function handleSaveConvocatoria() {
+async function handleSaveConvocatoria() {
   const jogoId = $('convJogoSelect').value;
   const ev = AppState.eventos.find(e=>e.id===jogoId);
   const convs = Array.from(document.querySelectorAll('.conv-chk:checked')).map(c=>c.value);
+  await apiCall('POST', `/api/eventos/jogos/${jogoId}/convocatoria`, { jogadores: convs });
   ev.convocados = convs;
   ev.respostas = {};
   closeModal('modalConvocatoria');
@@ -705,9 +819,10 @@ function openModalResposta(jogoId) {
 function showJustificacao() {
   show('divJustificacao');
 }
-function handleRespostaConv(resp) {
+async function handleRespostaConv(resp) {
   const ev = AppState.eventos.find(e=>e.id===AppState.selectedEvent);
   const myJog = AppState.jogadores.find(x=>x.contacto === AppState.user.contacto);
+  await apiCall('POST', `/api/eventos/jogos/${AppState.selectedEvent}/resposta`, { resposta: resp, nota: $('respJustificacao').value });
   if(!ev.respostas) ev.respostas = {};
   ev.respostas[myJog.id] = resp;
   closeModal('modalRespostaConvocatoria');
@@ -725,9 +840,10 @@ function openModalResultado(jogoId) {
   $('resCronica').value = '';
   openModal('modalResultado');
 }
-function handleSaveResultado(e) {
+async function handleSaveResultado(e) {
   e.preventDefault();
   const ev = AppState.eventos.find(x=>x.id===AppState.selectedEvent);
+  await apiCall('PUT', `/api/eventos/jogos/${AppState.selectedEvent}/resultado`, { golosMarcados: parseInt($('resGolosMarcados').value), golosSofridos: parseInt($('resGolosSofridos').value), cronica: $('resCronica').value });
   ev.resultado = {
     golosMarcados: parseInt($('resGolosMarcados').value),
     golosSofridos: parseInt($('resGolosSofridos').value),
@@ -787,14 +903,16 @@ function renderBoleiasList() {
   }
   $('bolListContainer').innerHTML = html;
 }
-function handleToggleReserva(bolId) {
+async function handleToggleReserva(bolId) {
   const b = AppState.boleias.find(x=>x.id===bolId);
   const idx = b.reservas.indexOf(AppState.user.id);
   if(idx>=0) {
+    await apiCall('DELETE', `/api/boleias/${bolId}/reserva`);
     b.reservas.splice(idx,1);
     showToast('Reserva cancelada.');
   } else {
     if(b.reservas.length < b.lugaresDisponiveis) {
+      await apiCall('POST', `/api/boleias/${bolId}/reservar`);
       b.reservas.push(AppState.user.id);
       showToast('Lugar reservado com sucesso!');
     }
@@ -802,8 +920,9 @@ function handleToggleReserva(bolId) {
   renderBoleiasList();
   renderBoleias();
 }
-function handleSaveBoleia(e) {
+async function handleSaveBoleia(e) {
   e.preventDefault();
+  await apiCall('POST', '/api/boleias', { jogoId: AppState.selectedEvent, viatura: $('bolViatura').value, lugaresDisponiveis: parseInt($('bolVagas').value) });
   AppState.boleias.push({
     id: 'b'+Date.now(),
     jogoId: AppState.selectedEvent,
@@ -825,9 +944,3 @@ function openModalComunicadoDetails(id) {
   alert(`COMUNICADO\n${c.titulo}\nData: ${formatDatePT(c.data)}\n\n${c.corpo}`);
   // In a full app, this would be a proper modal/view.
 }
-
-/* INIT */
-window.onload = () => {
-  // Try to find token if we had local storage, but requirements say JS var state.
-  navigate('login');
-};
