@@ -2,35 +2,12 @@
 const AppState = {
   user: null,
   currentView: 'login',
-  jogadores: [
-    { id: '1', nome: 'Tiago Silva', posicao: 'Defesa Central', dataNascimento: '1995-05-12', assiduidade: 82, contacto: '910000002', ativo: true, nomeEmergencia: 'Mãe', contactoEmergencia: '910000003' },
-    { id: '2', nome: 'Bruno Ferreira', posicao: 'Avançado', dataNascimento: '1998-02-22', assiduidade: 67, contacto: '910000004', ativo: true, nomeEmergencia: 'Pai', contactoEmergencia: '910000005' },
-    { id: '3', nome: 'Carlos Mota', posicao: 'Médio', dataNascimento: '1990-11-05', assiduidade: 1, contacto: '910000005', ativo: true, nomeEmergencia: 'Esposa', contactoEmergencia: '910000006' },
-    { id: '4', nome: 'André Costa', posicao: 'Guarda-Redes', dataNascimento: '2000-01-15', assiduidade: 75, contacto: '910000006', ativo: true, nomeEmergencia: 'Mãe', contactoEmergencia: '910000007' },
-    { id: '5', nome: 'Rui Pinto', posicao: 'Defesa Lateral', dataNascimento: '1996-08-30', assiduidade: 88, contacto: '910000007', ativo: true, nomeEmergencia: 'Irmão', contactoEmergencia: '910000008' },
-    { id: '6', nome: 'Pedro Nunes', posicao: 'Extremo', dataNascimento: '1999-04-10', assiduidade: 40, contacto: '910000008', ativo: true, nomeEmergencia: 'Pai', contactoEmergencia: '910000009' }
-  ],
-  eventos: [
-    { id: 'e1', tipo: 'Treino', data: '2026-04-17', hora: '20:00', local: 'Campo Principal', status: 'ativo' },
-    { id: 'e2', tipo: 'Jogo', data: '2026-04-20', hora: '15:00', local: 'Fora', adversario: 'GD Fundão', status: 'ativo', convocados: ['1', '2', '4', '5'], respostas: { '1': 'vou', '2':'naovou' } },
-    { id: 'e3', tipo: 'Jogo', data: '2026-04-28', hora: '15:00', local: 'Estádio Municipal do Tortosendo', adversario: 'CF Tortosendo', status: 'ativo', convocados: ['1','2','3','4','5','6'], respostas: {} },
-    { id: 'e4', tipo: 'Jogo', data: '2026-04-13', hora: '15:00', local: 'Campo Principal', adversario: 'SC Covilhã B', status: 'ativo', resultado: { golosMarcados: 3, golosSofridos: 1, cronica: 'Grande jogo de toda a equipa!' } },
-    { id: 'e5', tipo: 'Treino', data: '2026-04-10', hora: '19:30', local: 'Campo Principal', status: 'cancelado' }
-  ],
-  comunicados: [
-    { id: 'c1', categoria: 'Direção', data: '2026-04-11', titulo: 'Inscrições na Associação – Prazo!', corpo: 'Atenção a todos os jogadores: o prazo para renovar a inscrição na Associação de Futebol é dia 30 de Abril. Que ninguem se atrase.' },
-    { id: 'c2', categoria: 'Equipa Técnica', data: '2026-04-11', titulo: 'Treino de Quarta Alterado', corpo: 'O treino de quarta-feira 17 Abr foi alterado de 18:30 para as 20:00, por indisponibilidade do campo. Peço desculpa pelo transtorno.' },
-    { id: 'c3', categoria: 'Direção', data: '2026-04-13', titulo: 'Parabéns pela Vitória!', corpo: '1-1 ao SC Covilhã B! Que orgulho desta equipa. Convido todos para o cozido de domingo na sede.' }
-  ],
-  boleias: [
-    { id: 'b1', jogoId: 'e3', condutorId: 'u3', condutorNome: 'Tiago Silva', viatura: 'Clio Azul', lugaresDisponiveis: 2, reservas: [] }
-  ],
-  users: [
-    { id: 'u1', nome: 'Quim Barrela', contacto: '910000001', password: 'quim123', role: 'presidente', token: 'tok_1' },
-    { id: 'u2', nome: 'Mister Zé', contacto: '910000010', password: 'mister123', role: 'treinador', token: 'tok_2' },
-    { id: 'u3', nome: 'Tiago Silva', contacto: '910000002', password: 'tiago123', role: 'jogador', token: 'tok_3' }
-  ],
-  currentDate: new Date(2026, 3, 1), // April 2026
+  jogadores: [],
+  eventos: [],
+  comunicados: [],
+  boleias: [],
+  users: [],
+  currentDate: new Date(),
   activeModal: null,
   selectedEvent: null
 };
@@ -54,18 +31,35 @@ function formatDatePT(dateStr) {
 function getInitials(name) {
   return name.split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase();
 }
+const THEME_STORAGE_KEY = 'osbeiroes_theme';
+function syncThemeFromStorage() {
+  const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+  if (savedTheme) {
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    return;
+  }
+  const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+}
+function applyTheme(theme) {
+  const t = theme === 'dark' ? 'dark' : 'light';
+  document.documentElement.setAttribute('data-theme', t);
+  localStorage.setItem(THEME_STORAGE_KEY, t);
+}
 function toggleTheme() {
   const t = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-  document.documentElement.setAttribute('data-theme', t);
+  applyTheme(t);
 }
 async function fakeNetworkDelay() {
   return new Promise(r => setTimeout(r, 400 + Math.random()*400));
 }
 
 /* API CALL */
-async function apiCall(method, endpoint, body) {
+const API_BASE = 'https://api.osbeiroes.cc';
+
+async function apiCall(method, endpoint, body, options = {}) {
   try {
-    const res = await fetch(`https://api.osbeiroes.cc${endpoint}`, {
+    const res = await fetch(`${API_BASE}${endpoint}`, {
       method,
       headers: {
         'Content-Type': 'application/json',
@@ -73,6 +67,11 @@ async function apiCall(method, endpoint, body) {
       },
       body: body ? JSON.stringify(body) : null
     });
+    if (res.status === 404 && options.retry404 !== false) {
+      const hasApiPrefix = endpoint.startsWith('/api/');
+      const alt = hasApiPrefix ? endpoint.replace('/api', '') : `/api${endpoint}`;
+      if (alt !== endpoint) return await apiCall(method, alt, body, { ...options, retry404: false });
+    }
     if (res.status === 403) { showToast('Não tens permissão para esta ação.', 'error'); throw new Error('403'); }
     if (res.status === 400) { const e = await res.json(); showToast(e.message || 'Dados inválidos.', 'error'); throw new Error('400'); }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -89,6 +88,28 @@ async function apiCall(method, endpoint, body) {
   }
 }
 
+let dataLoaded = false;
+async function ensureDataLoaded() {
+  if (dataLoaded) return;
+  if (!AppState.user?.token) return;
+
+  const [eventos, comunicados, boleias] = await Promise.all([
+    apiCall('GET', '/api/eventos'),
+    apiCall('GET', '/api/comunicados'),
+    apiCall('GET', '/api/boleias')
+  ]);
+  let jogadores = await apiCall('GET', '/api/jogadores/jogador');
+  if (!Array.isArray(jogadores)) jogadores = await apiCall('GET', '/api/jogadores');
+
+  if (Array.isArray(eventos)) AppState.eventos = eventos;
+  if (Array.isArray(comunicados)) AppState.comunicados = comunicados;
+  if (Array.isArray(jogadores)) AppState.jogadores = jogadores;
+  if (Array.isArray(boleias)) AppState.boleias = boleias;
+
+  dataLoaded = true;
+  saveState();
+}
+
 /* AUTH */
 function fillLogin(c, p) { $('loginContacto').value=c; $('loginPassword').value=p; }
 
@@ -103,10 +124,13 @@ async function handleLogin(e) {
   $('fullLoader').classList.add('hidden');
   
   if (res) {
-    let u = AppState.users.find(x => x.contacto === c);
-    if (!u) u = { id: 'u0', nome: 'Utilizador', contacto: c, role: 'jogador' };
-    u.token = typeof res === 'string' ? res : (res.token || 'tok_1');
+    const token = typeof res === 'string' ? res : (res.token || res.accessToken || res.jwt || null);
+    const apiUser = typeof res === 'object' ? (res.user || res.utilizador || res.profile) : null;
+    let u = apiUser || AppState.users.find(x => x.contacto === c) || { id: 'u0', nome: 'Utilizador', contacto: c, role: 'jogador' };
+    u = { ...u, token };
     AppState.user = u;
+    dataLoaded = false;
+    await ensureDataLoaded();
     navigate('home');
     showToast('Sessão iniciada com sucesso.');
   } else {
@@ -138,15 +162,17 @@ async function handleRegister(e) {
   
   $('fullLoader').classList.add('hidden');
   
-  const newUser = {
+  const token = res ? (typeof res === 'string' ? res : (res.token || res.accessToken || res.jwt)) : 'tok_new';
+  const apiUser = res && typeof res === 'object' ? (res.user || res.utilizador || res.profile) : null;
+  const newUser = apiUser || {
     id: 'u' + Date.now(),
     nome: body.nome,
     contacto: body.contacto,
-    role: body.role,
-    token: res ? (typeof res === 'string' ? res : res.token) : 'tok_new'
+    role: body.role
   };
-  AppState.users.push(newUser);
-  AppState.user = newUser;
+  AppState.user = { ...newUser, token };
+  dataLoaded = false;
+  await ensureDataLoaded();
   navigate('home');
   showToast(res ? 'Conta criada com sucesso.' : 'Conta criada (Modo Offline).');
 }
@@ -175,6 +201,11 @@ const saved = localStorage.getItem('osbeiroes_state');
 if (saved) {
     Object.assign(AppState, JSON.parse(saved));
 }
+syncThemeFromStorage();
+document.addEventListener('astro:page-load', syncThemeFromStorage);
+window.addEventListener('storage', (e) => {
+  if (e.key === THEME_STORAGE_KEY) syncThemeFromStorage();
+});
 
 // Save state on unload
 window.addEventListener('beforeunload', () => {
@@ -212,7 +243,9 @@ async function handleAutoLogin() {
 }
 
 
-function renderView(view) {
+async function renderView(view) {
+  AppState.currentView = view;
+  await ensureDataLoaded();
   if(view==='home') renderHome();
   if(view==='calendar') renderCalendar();
   if(view==='jogos') renderJogos();
@@ -231,10 +264,8 @@ function renderHome() {
   else hide('homeQuickActions');
   
   // Today's events
-  const todayStr = AppState.currentDate.toISOString().split('T')[0];
-  // Fake today's date for demo
-  const mockToday = '2026-04-20'; 
-  const eventosHoje = AppState.eventos.filter(e => e.data === mockToday && e.status==='ativo');
+  const todayStr = new Date().toISOString().split('T')[0];
+  const eventosHoje = AppState.eventos.filter(e => e.data === todayStr && e.status==='ativo');
   
   let html = '';
   if(eventosHoje.length === 0) {
@@ -285,7 +316,8 @@ function changeMonth(dir) {
   renderCalendar();
 }
 function renderCalendar() {
-  const date = new Date(2026, 3 + calMonthOffset, 1);
+  const now = new Date();
+  const date = new Date(now.getFullYear(), now.getMonth() + calMonthOffset, 1);
   const monthNames = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
   $('calendarMonthYear').innerText = `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
   
@@ -309,7 +341,8 @@ function renderCalendar() {
       dots += `<div class="dot dot-${e.tipo.toLowerCase()}"></div>`;
     });
     
-    const isToday = (fullDate === '2026-04-20') ? 'today' : '';
+    const todayStr = new Date().toISOString().split('T')[0];
+    const isToday = (fullDate === todayStr) ? 'today' : '';
     grid += `<div class="calendar-day ${isToday}" onclick="selectDate('${fullDate}', this)">${i}<div class="calendar-dots">${dots}</div></div>`;
   }
   $('calendarGrid').innerHTML = grid;
@@ -318,7 +351,7 @@ function renderCalendar() {
   if(r==='presidente'||r==='treinador') show('btnNovoEvento'); else hide('btnNovoEvento');
   
   // Select today or first day
-  selectDate('2026-04-20', null); 
+  selectDate(new Date().toISOString().split('T')[0], null);
 }
 
 function selectDate(dateStr, el) {
@@ -429,7 +462,7 @@ function renderJogos() {
   switchJogosTab('convocatorias');
   
   const jogos = AppState.eventos.filter(e=>e.tipo==='Jogo').sort((a,b)=>a.data.localeCompare(b.data));
-  const today = '2026-04-20';
+  const today = new Date().toISOString().split('T')[0];
   
   const upcoming = jogos.filter(j => j.data >= today);
   const past = jogos.filter(j => j.data < today);
@@ -521,7 +554,7 @@ function renderJogos() {
 
 /* BOLEIAS */
 function renderBoleias() {
-  const today = '2026-04-20';
+  const today = new Date().toISOString().split('T')[0];
   const jogosFora = AppState.eventos.filter(e => e.tipo==='Jogo' && e.local.toLowerCase() !== 'campo principal' && e.data >= today);
   
   let html = '';
