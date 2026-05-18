@@ -5,7 +5,7 @@ import Layout from '../layouts/Layout.astro';
 <Layout title="Os Beirões - Plantel" showNav={true} activeNav="plantel">
   <div class="view active">
     <div class="d-flex align-center gap-2 mb-4">
-      <button class="icon-btn" onclick="navigate(\'perfil\')"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <button class="icon-btn" onclick="navigate('perfil')"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
       <h2 class="bebas" style="font-size:32px;margin-top:4px;">GESTÃO DO PLANTEL</h2>
     </div>
     
@@ -15,7 +15,7 @@ import Layout from '../layouts/Layout.astro';
     </div>
     
     <div id="plantelContainer"></div>
-    <button class="btn-fab" onclick="openModal('modalJogador')">
+    <button id="btnNovoJogador" class="btn-fab" onclick="openModal('modalJogador')">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
     </button>
     

@@ -6,18 +6,31 @@ const AppState = {
   eventos: [],
   comunicados: [],
   boleias: [],
+  viaturas: [],
   users: [],
   currentDate: new Date(),
   activeModal: null,
-  selectedEvent: null
+  selectedEvent: null,
+  selectedDate: null
 };
 
 /* UTILS */
 function $(id) { return document.getElementById(id); }
-function show(id) { $(id).classList.remove('hidden'); }
-function hide(id) { $(id).classList.add('hidden'); }
+function show(id) {
+  const el = $(id);
+  if (!el) return;
+  if (el.classList.contains('modal-backdrop')) el.classList.add('active');
+  else el.classList.remove('hidden');
+}
+function hide(id) {
+  const el = $(id);
+  if (!el) return;
+  if (el.classList.contains('modal-backdrop')) el.classList.remove('active');
+  else el.classList.add('hidden');
+}
 function showToast(msg, type='success') {
   const c = $('toastContainer');
+  if (!c) return;
   const t = document.createElement('div');
   t.className = `toast ${type}`;
   t.innerHTML = type === 'success' ? `✅ ${msg}` : `❌ ${msg}`;
@@ -25,11 +38,147 @@ function showToast(msg, type='success') {
   setTimeout(() => { t.style.opacity=0; setTimeout(()=>t.remove(),300); }, 3000);
 }
 function formatDatePT(dateStr) {
+  if (!dateStr) return '';
   const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return dateStr;
   return d.toLocaleDateString('pt-PT', { day:'2-digit', month:'2-digit', year:'numeric' });
 }
 function getInitials(name) {
-  return name.split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase();
+  return (name || '?').split(' ').filter(Boolean).slice(0,2).map(n=>n[0]).join('').toUpperCase();
+}
+function pad2(n) { return String(n).padStart(2, '0'); }
+function toDateInputValue(value) {
+  if (!value) return '';
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value)) return value.slice(0, 10);
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+function toTimeInputValue(value) {
+  if (!value) return '';
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value)) return value.slice(11, 16);
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+function combineDateTime(date, time) {
+  return `${date}T${time || '00:00'}:00`;
+}
+function normalizeRole(role) {
+  return String(role || 'jogador')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+function roleForApi(role) {
+  const normalized = normalizeRole(role);
+  if (normalized === 'presidente') return 'Presidente';
+  if (normalized === 'treinador') return 'Treinador';
+  return 'Jogador';
+}
+function decodeJwt(token) {
+  try {
+    const payload = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const json = decodeURIComponent(atob(payload).split('').map(c => `%${(`00${c.charCodeAt(0).toString(16)}`).slice(-2)}`).join(''));
+    return JSON.parse(json);
+  } catch (e) {
+    return {};
+  }
+}
+function normalizeUser(user = {}) {
+  return {
+    ...user,
+    id: String(user.id ?? user.user_id ?? user.contacto ?? `u${Date.now()}`),
+    nome: user.nome || user.name || 'Utilizador',
+    contacto: user.contacto || user.phone || '',
+    role: normalizeRole(user.role || user.tipo),
+    tipo: user.tipo || roleForApi(user.role),
+    dataNascimento: user.dataNascimento || user.data_nascimento || '',
+    nomeEmergencia: user.nomeEmergencia || user.nome_emergencia || '',
+    contactoEmergencia: user.contactoEmergencia || user.contacto_emergencia || '',
+    posicao: user.posicao || '',
+    ativo: user.ativo !== false,
+    assiduidade: Number(user.assiduidade ?? 0)
+  };
+}
+function normalizeEvent(evento = {}) {
+  const dateTime = evento.data_hora || evento.dataHora || (evento.data ? combineDateTime(evento.data, evento.hora) : null);
+  const tipo = evento.tipo || (evento.adversario ? 'Jogo' : 'Treino');
+  const estado = evento.estado || evento.status || 'Agendado';
+  const convocadosObj = evento.convocatoria?.convocados || evento.convocados || {};
+  const convocados = Array.isArray(convocadosObj) ? convocadosObj : Object.keys(convocadosObj);
+  const respostas = {};
+  if (!Array.isArray(convocadosObj)) {
+    Object.entries(convocadosObj).forEach(([id, resposta]) => {
+      if (resposta && typeof resposta === 'object') respostas[id] = resposta.estado ? 'vou' : null;
+      else if (resposta === true || resposta === 'vou') respostas[id] = 'vou';
+      else if (resposta === 'naovou') respostas[id] = 'naovou';
+    });
+  }
+  const gf = Number(evento.golos_favor ?? evento.golosMarcados ?? -1);
+  const gc = Number(evento.golos_contra ?? evento.golosSofridos ?? -1);
+  const resultado = evento.resultado || ((gf > 0 || gc > 0) ? { golosMarcados: gf, golosSofridos: gc, cronica: evento.cronica || '' } : null);
+
+  return {
+    ...evento,
+    id: String(evento.id ?? `e${Date.now()}`),
+    tipo,
+    data: toDateInputValue(dateTime || evento.data),
+    hora: toTimeInputValue(dateTime || evento.hora),
+    data_hora: dateTime,
+    local: evento.local || '',
+    status: normalizeRole(estado) === 'cancelado' ? 'cancelado' : 'ativo',
+    estado,
+    adversario: evento.adversario || '',
+    convocados,
+    respostas,
+    resultado
+  };
+}
+function normalizeComunicado(comunicado = {}) {
+  return {
+    ...comunicado,
+    id: String(comunicado.id ?? `c${Date.now()}`),
+    titulo: comunicado.titulo || 'Comunicado',
+    corpo: comunicado.corpo || '',
+    data: toDateInputValue(comunicado.data) || new Date().toISOString().slice(0, 10),
+    categoria: comunicado.categoria || 'Direcao'
+  };
+}
+function normalizeViatura(viatura = {}) {
+  return {
+    ...viatura,
+    id: String(viatura.id ?? viatura.matricula ?? `v${Date.now()}`),
+    modelo: viatura.modelo || 'Viatura',
+    matricula: viatura.matricula || '',
+    lugares_totais: Number(viatura.lugares_totais ?? viatura.lugaresTotais ?? 0),
+    proprietario: viatura.proprietario || null
+  };
+}
+function normalizeBoleia(boleia = {}) {
+  const viatura = normalizeViatura(boleia.viatura || {});
+  const passageiros = Array.isArray(boleia.passageiros) ? boleia.passageiros : [];
+  const reservas = passageiros.map(p => String(p?.id ?? p)).filter(Boolean);
+  const owner = viatura.proprietario || {};
+  return {
+    ...boleia,
+    id: String(boleia.id ?? `b${Date.now()}`),
+    jogoId: String(boleia.jogoId ?? boleia.jogo_id ?? boleia.jogo?.id ?? ''),
+    condutorId: String(boleia.condutorId ?? owner.id ?? ''),
+    condutorNome: boleia.condutorNome || owner.nome || viatura.modelo || 'Condutor',
+    viatura: boleia.viaturaLabel || boleia.viaturaNome || viatura.modelo,
+    viaturaId: boleia.viatura_id || viatura.id,
+    lugaresDisponiveis: Number(boleia.lugaresDisponiveis ?? boleia.max_lugares ?? boleia.lugares_vagos ?? 0),
+    lugaresVagos: Number(boleia.lugares_vagos ?? 0),
+    partida: boleia.partida,
+    reservas
+  };
+}
+function asArray(data, key) {
+  if (Array.isArray(data)) return data;
+  if (data && Array.isArray(data[key])) return data[key];
+  if (data && typeof data === 'object') return Object.values(data);
+  return [];
 }
 const THEME_STORAGE_KEY = 'osbeiroes_theme';
 function syncThemeFromStorage() {
@@ -55,11 +204,16 @@ async function fakeNetworkDelay() {
 }
 
 /* API CALL */
-const API_BASE = 'https://api.osbeiroes.cc';
+const API_BASE = window.OS_BEIROES_API_BASE || localStorage.getItem('osbeiroes_api_base') || 'https://api.osbeiroes.cc';
+
+function apiEndpoint(endpoint) {
+  return endpoint;
+}
 
 async function apiCall(method, endpoint, body, options = {}) {
+  const cleanEndpoint = apiEndpoint(endpoint);
   try {
-    const res = await fetch(`${API_BASE}${endpoint}`, {
+    const res = await fetch(`${API_BASE}${cleanEndpoint}`, {
       method,
       headers: {
         'Content-Type': 'application/json',
@@ -67,14 +221,18 @@ async function apiCall(method, endpoint, body, options = {}) {
       },
       body: body ? JSON.stringify(body) : null
     });
-    if (res.status === 404 && options.retry404 !== false) {
-      const hasApiPrefix = endpoint.startsWith('/api/');
-      const alt = hasApiPrefix ? endpoint.replace('/api', '') : `/api${endpoint}`;
-      if (alt !== endpoint) return await apiCall(method, alt, body, { ...options, retry404: false });
+    if (!res.ok) {
+      let errorPayload = {};
+      try {
+        errorPayload = await res.json();
+      } catch(e) {}
+      const apiMessage = errorPayload.message || errorPayload.error;
+      if (res.status === 403) showToast('Não tens permissão para esta ação.', 'error');
+      else if (res.status === 401 && endpoint !== '/auth/login') showToast('Sessão expirada ou inválida.', 'error');
+      else if (res.status === 400) showToast(apiMessage || 'Dados inválidos.', 'error');
+      else if (endpoint !== '/auth/login') showToast(apiMessage || `Erro da API (${res.status}).`, 'error');
+      return null;
     }
-    if (res.status === 403) { showToast('Não tens permissão para esta ação.', 'error'); throw new Error('403'); }
-    if (res.status === 400) { const e = await res.json(); showToast(e.message || 'Dados inválidos.', 'error'); throw new Error('400'); }
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     
     const text = await res.text();
     try {
@@ -83,28 +241,61 @@ async function apiCall(method, endpoint, body, options = {}) {
       return text;
     }
   } catch (err) {
-    console.warn(`API falhou (${endpoint}), a usar fallback local.`);
+    console.warn(`API falhou (${endpoint}).`);
+    if (method !== 'GET' && endpoint !== '/auth/login') {
+      showToast('Não foi possível contactar a API.', 'error');
+    }
     return null;
   }
 }
 
 let dataLoaded = false;
+const loadedEventMonths = new Set();
+
+function calendarBaseDate() {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth() + calMonthOffset, 1);
+}
+function monthKey(date) {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}`;
+}
+async function loadEventosForMonth(date, force = false) {
+  if (!AppState.user?.token) return;
+  const key = monthKey(date);
+  if (!force && loadedEventMonths.has(key)) return;
+  const eventos = await apiCall('GET', `/eventos?ano=${date.getFullYear()}&mes=${date.getMonth() + 1}`);
+  if (eventos) {
+    const normalized = asArray(eventos, 'eventos').map(normalizeEvent);
+    const otherMonths = AppState.eventos.filter(e => e.data?.slice(0, 7) !== key);
+    AppState.eventos = [...otherMonths, ...normalized];
+    loadedEventMonths.add(key);
+  }
+}
 async function ensureDataLoaded() {
-  if (dataLoaded) return;
+  if (dataLoaded) {
+    await loadEventosForMonth(calendarBaseDate());
+    return;
+  }
   if (!AppState.user?.token) return;
 
-  const [eventos, comunicados, boleias] = await Promise.all([
-    apiCall('GET', '/api/eventos'),
-    apiCall('GET', '/api/comunicados'),
-    apiCall('GET', '/api/boleias')
+  const [comunicados, boleias, jogadores, viaturas] = await Promise.all([
+    apiCall('GET', '/comunicados'),
+    apiCall('GET', '/boleias'),
+    apiCall('GET', '/jogadores'),
+    apiCall('GET', '/viaturas')
   ]);
-  let jogadores = await apiCall('GET', '/api/jogadores/jogador');
-  if (!Array.isArray(jogadores)) jogadores = await apiCall('GET', '/api/jogadores');
 
-  if (Array.isArray(eventos)) AppState.eventos = eventos;
-  if (Array.isArray(comunicados)) AppState.comunicados = comunicados;
-  if (Array.isArray(jogadores)) AppState.jogadores = jogadores;
-  if (Array.isArray(boleias)) AppState.boleias = boleias;
+  if (comunicados) AppState.comunicados = asArray(comunicados, 'comunicados').map(normalizeComunicado);
+  if (jogadores) {
+    const allUsers = asArray(jogadores, 'jogadores').map(normalizeUser);
+    AppState.users = allUsers;
+    AppState.jogadores = allUsers.filter(u => u.role === 'jogador');
+    const current = allUsers.find(u => u.contacto === AppState.user.contacto || u.id === AppState.user.id);
+    if (current) AppState.user = { ...AppState.user, ...current, token: AppState.user.token };
+  }
+  if (boleias) AppState.boleias = asArray(boleias, 'boleias').map(normalizeBoleia);
+  if (viaturas) AppState.viaturas = asArray(viaturas, 'viaturas').map(normalizeViatura);
+  await loadEventosForMonth(calendarBaseDate());
 
   dataLoaded = true;
   saveState();
@@ -124,9 +315,15 @@ async function handleLogin(e) {
   $('fullLoader').classList.add('hidden');
   
   if (res) {
-    const token = typeof res === 'string' ? res : (res.token || res.accessToken || res.jwt || null);
+    const token = typeof res === 'string' ? res : (res.access_token || res.token || res.accessToken || res.jwt || null);
+    const claims = token ? decodeJwt(token) : {};
     const apiUser = typeof res === 'object' ? (res.user || res.utilizador || res.profile) : null;
-    let u = apiUser || AppState.users.find(x => x.contacto === c) || { id: 'u0', nome: 'Utilizador', contacto: c, role: 'jogador' };
+    let u = normalizeUser(apiUser || AppState.users.find(x => x.contacto === c) || {
+      id: claims.sub || c,
+      nome: 'Utilizador',
+      contacto: claims.sub || c,
+      role: claims.role || 'Jogador'
+    });
     u = { ...u, token };
     AppState.user = u;
     dataLoaded = false;
@@ -137,7 +334,7 @@ async function handleLogin(e) {
     // Fallback Mock
     const u = AppState.users.find(x => x.contacto === c && x.password === p);
     if(u) {
-      AppState.user = u;
+      AppState.user = { ...normalizeUser(u), token: u.token || 'tok_local' };
       navigate('home');
       showToast('Sessão iniciada (Modo Offline).');
     } else {
@@ -158,18 +355,19 @@ async function handleRegister(e) {
     password: $('regPassword').value,
     role: $('regRole').value
   };
-  const res = await apiCall('POST', '/auth/register', body);
+  const res = null;
   
   $('fullLoader').classList.add('hidden');
   
-  const token = res ? (typeof res === 'string' ? res : (res.token || res.accessToken || res.jwt)) : 'tok_new';
+  const token = res ? (typeof res === 'string' ? res : (res.access_token || res.token || res.accessToken || res.jwt)) : 'tok_new';
   const apiUser = res && typeof res === 'object' ? (res.user || res.utilizador || res.profile) : null;
-  const newUser = apiUser || {
+  const newUser = normalizeUser(apiUser || {
     id: 'u' + Date.now(),
     nome: body.nome,
     contacto: body.contacto,
     role: body.role
-  };
+  });
+  AppState.users.push({ ...newUser, password: body.password });
   AppState.user = { ...newUser, token };
   dataLoaded = false;
   await ensureDataLoaded();
@@ -178,28 +376,28 @@ async function handleRegister(e) {
 }
 function handleLogout() {
   AppState.user = null;
+  dataLoaded = false;
+  localStorage.removeItem('osbeiroes_state');
   navigate('login');
 }
 
 /* NAVIGATION & RENDERING */
 
-// Load modals once
-let modalsLoaded = false;
-async function loadModals() {
-  if (modalsLoaded) return;
-  try {
-    const res = await fetch('views/modals.html');
-    const html = await res.text();
-    $('modalsContainer').innerHTML = html;
-    modalsLoaded = true;
-  } catch(e) { console.error('Erro ao carregar modals', e); }
-}
-
-
 // Load state from local storage on init if present
 const saved = localStorage.getItem('osbeiroes_state');
 if (saved) {
-    Object.assign(AppState, JSON.parse(saved));
+    try {
+      Object.assign(AppState, JSON.parse(saved));
+      AppState.currentDate = new Date(AppState.currentDate || Date.now());
+      AppState.user = AppState.user ? normalizeUser(AppState.user) : null;
+      AppState.jogadores = asArray(AppState.jogadores).map(normalizeUser);
+      AppState.eventos = asArray(AppState.eventos).map(normalizeEvent);
+      AppState.comunicados = asArray(AppState.comunicados).map(normalizeComunicado);
+      AppState.boleias = asArray(AppState.boleias).map(normalizeBoleia);
+      AppState.viaturas = asArray(AppState.viaturas).map(normalizeViatura);
+    } catch (e) {
+      localStorage.removeItem('osbeiroes_state');
+    }
 }
 syncThemeFromStorage();
 document.addEventListener('astro:page-load', syncThemeFromStorage);
@@ -223,14 +421,12 @@ window.navigate = function(view) {
   window.location.href = target; // Use client router navigation indirectly
 };
 
-async function loadModals() {}
-
 // Wrap renderViews to ensure state runs 
 const _origRenderView = renderView;
-window.renderView = function(view) {
+window.renderView = async function(view) {
   saveState();
   try {
-    _origRenderView(view);
+    await _origRenderView(view);
   } catch(e) { console.warn("View render ignored because element not found (Astro handled it).") }
 };
 
@@ -245,6 +441,10 @@ async function handleAutoLogin() {
 
 async function renderView(view) {
   AppState.currentView = view;
+  if (!AppState.user && !['login', 'register'].includes(view)) {
+    navigate('login');
+    return;
+  }
   await ensureDataLoaded();
   if(view==='home') renderHome();
   if(view==='calendar') renderCalendar();
@@ -294,7 +494,7 @@ function renderHome() {
   const coms = AppState.comunicados.slice().reverse().slice(0,3);
   let chtml = '';
   coms.forEach(c => {
-    const badge = c.categoria==='Direção' ? 'badge-red' : 'badge-green';
+    const badge = normalizeRole(c.categoria)==='direcao' ? 'badge-red' : 'badge-green';
     chtml += `
       <div class="card" onclick="openModalComunicadoDetails('${c.id}')">
         <div class="d-flex justify-between align-center mb-2">
@@ -311,13 +511,14 @@ function renderHome() {
 
 /* CALENDAR */
 let calMonthOffset = 0;
-function changeMonth(dir) {
+async function changeMonth(dir) {
   calMonthOffset += dir;
+  await loadEventosForMonth(calendarBaseDate());
   renderCalendar();
 }
 function renderCalendar() {
   const now = new Date();
-  const date = new Date(now.getFullYear(), now.getMonth() + calMonthOffset, 1);
+  const date = calendarBaseDate();
   const monthNames = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
   $('calendarMonthYear').innerText = `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
   
@@ -350,11 +551,13 @@ function renderCalendar() {
   const r = AppState.user.role;
   if(r==='presidente'||r==='treinador') show('btnNovoEvento'); else hide('btnNovoEvento');
   
-  // Select today or first day
-  selectDate(new Date().toISOString().split('T')[0], null);
+  const todayStr = new Date().toISOString().split('T')[0];
+  const selected = todayStr.startsWith(`${yStr}-${mStr}`) ? todayStr : `${yStr}-${mStr}-01`;
+  selectDate(AppState.selectedDate?.startsWith(`${yStr}-${mStr}`) ? AppState.selectedDate : selected, null);
 }
 
 function selectDate(dateStr, el) {
+  AppState.selectedDate = dateStr;
   if(el) {
     document.querySelectorAll('.calendar-day').forEach(d=>d.classList.remove('active'));
     el.classList.add('active');
@@ -379,7 +582,7 @@ function selectDate(dateStr, el) {
       let clickAction = '';
       const r = AppState.user.role;
       if(!isCanc) {
-        if(r==='presidente'||r==='treinador') {
+        if(r==='treinador') {
           if(e.tipo==='Treino') clickAction = `onclick="openModalPresencas('${e.id}')"`;
           if(e.tipo==='Jogo') clickAction = `onclick="navigate('jogos')"`;
         }
@@ -414,34 +617,32 @@ function setEventoTipo(tipo) {
 async function handleSaveEvento(e) {
   e.preventDefault();
   const id = $('evId').value || 'e'+Date.now();
+  const date = $('evData').value;
+  const time = $('evHora').value;
   const body = {
     tipo: $('evTipo').value,
-    data: $('evData').value,
-    hora: $('evHora').value,
+    data_hora: combineDateTime(date, time),
     local: $('evLocal').value,
-    status: $('evStatus').value,
     adversario: $('evTipo').value==='Jogo' ? $('evAdversario').value : undefined
   };
   const isEdit = !!$('evId').value;
-  const endpoint = isEdit ? `/api/eventos/${$('evId').value}` : '/api/eventos';
-  const method = isEdit ? 'PUT' : 'POST';
-  await apiCall(method, endpoint, body);
+  const res = isEdit ? null : await apiCall('POST', '/eventos', body);
+  if (!isEdit && !res) return;
   
-  const ev = {
+  const ev = normalizeEvent({
+    ...body,
     id,
-    tipo: $('evTipo').value,
-    data: $('evData').value,
-    hora: $('evHora').value,
-    local: $('evLocal').value,
-    status: $('evStatus').value,
-    adversario: $('evTipo').value==='Jogo' ? $('evAdversario').value : undefined
-  };
+    id: res?.id || id,
+    estado: $('evStatus').value === 'cancelado' ? 'Cancelado' : 'Agendado'
+  });
   const idx = AppState.eventos.findIndex(x=>x.id===id);
   if(idx>=0) AppState.eventos[idx] = ev;
   else AppState.eventos.push(ev);
+  loadedEventMonths.add(ev.data.slice(0, 7));
   
   closeModal('modalEvento');
-  renderCalendar();
+  if(AppState.currentView==='calendar') renderCalendar();
+  if(AppState.currentView==='home') renderHome();
   showToast('Evento guardado!');
 }
 
@@ -451,7 +652,7 @@ function switchJogosTab(tab) {
     $('tabConvocatorias').classList.add('active'); $('tabResultados').classList.remove('active');
     show('jogosConvocatoriasContainer'); hide('jogosResultadosContainer');
     const r = AppState.user.role;
-    if(r==='presidente'||r==='treinador') show('btnNovaConvocatoria'); else hide('btnNovaConvocatoria');
+    if(r==='treinador') show('btnNovaConvocatoria'); else hide('btnNovaConvocatoria');
   } else {
     $('tabConvocatorias').classList.remove('active'); $('tabResultados').classList.add('active');
     hide('jogosConvocatoriasContainer'); show('jogosResultadosContainer');
@@ -466,6 +667,8 @@ function renderJogos() {
   
   const upcoming = jogos.filter(j => j.data >= today);
   const past = jogos.filter(j => j.data < today);
+  if(AppState.user.role==='treinador' && upcoming.length > 0) show('btnNovaConvocatoria');
+  else hide('btnNovaConvocatoria');
   
   // Convocatórias
   let cHtml = '';
@@ -477,7 +680,7 @@ function renderJogos() {
     
     if(!j.convocados || j.convocados.length===0) {
       convStatus = '<span class="badge badge-gray">Aguardar Convocatória</span>';
-      if(r==='treinador'||r==='presidente') btnHtml = `<button class="btn btn-secondary mt-2" style="height:36px;font-size:14px;" onclick="openModalConvocatoria('${j.id}')">Criar Convocatória</button>`;
+      if(r==='treinador') btnHtml = `<button class="btn btn-secondary mt-2" style="height:36px;font-size:14px;" onclick="openModalConvocatoria('${j.id}')">Criar Convocatória</button>`;
     } else {
       const confs = Object.values(j.respostas||{}).filter(v=>v==='vou').length;
       convStatus = `<span class="badge badge-green">${confs} Confirmados</span> <span class="badge badge-gray ml-2">${j.convocados.length} Convocados</span>`;
@@ -496,7 +699,7 @@ function renderJogos() {
         } else {
           btnHtml = `<div class="mt-2 text-muted text-center" style="font-size:14px;">Não estás convocado.</div>`;
         }
-      } else {
+      } else if(r==='treinador') {
          btnHtml = `<button class="btn btn-secondary mt-2" style="height:36px;font-size:14px;" onclick="openModalConvocatoria('${j.id}')">Editar Convocatória</button>`;
       }
     }
@@ -567,7 +770,7 @@ function renderBoleias() {
       let vagasTotais = 0;
       bs.forEach(b => {
         avatHtml += `<div class="avatar" style="width:32px;height:32px;font-size:12px;border:2px solid #fff;margin-left:-8px;">${getInitials(b.condutorNome)}</div>`;
-        vagasTotais += b.lugaresDisponiveis;
+        vagasTotais += Math.max(0, b.lugaresDisponiveis - (b.reservas?.length || 0));
       });
       if(bs.length>0) avatHtml = `<div class="d-flex" style="padding-left:8px;">${avatHtml}</div>`;
       
@@ -594,13 +797,27 @@ function renderBoleias() {
 }
 
 /* PLANTEL */
+let plantelPage = 1;
+const LIST_PAGE_SIZE = 5;
+function changePlantelPage(page) {
+  plantelPage = page;
+  renderPlantel();
+}
 function renderPlantel() {
+  const addButton = $('btnNovoJogador');
+  if(addButton) {
+    if(AppState.user.role==='presidente' || AppState.user.role==='treinador') show('btnNovoJogador');
+    else hide('btnNovoJogador');
+  }
   const search = $('searchJogador').value.toLowerCase();
   let list = AppState.jogadores;
   if(search) list = list.filter(j => j.nome.toLowerCase().includes(search));
+  const totalPages = Math.max(1, Math.ceil(list.length / LIST_PAGE_SIZE));
+  if (plantelPage > totalPages) plantelPage = totalPages;
+  const pageItems = list.slice((plantelPage - 1) * LIST_PAGE_SIZE, plantelPage * LIST_PAGE_SIZE);
   
   let html = '';
-  list.forEach(j => {
+  pageItems.forEach(j => {
     html += `
       <div class="card d-flex align-center gap-4" style="cursor:pointer;opacity:${j.ativo?1:0.5};" onclick="openModalPlayerProfile('${j.id}')">
         <div class="avatar">${getInitials(j.nome)}</div>
@@ -615,17 +832,35 @@ function renderPlantel() {
       </div>
     `;
   });
+  if (list.length === 0) {
+    html = '<div class="empty-state"><p>Nenhum jogador encontrado.</p></div>';
+  } else if (totalPages > 1) {
+    html += `
+      <div class="pagination">
+        <button class="btn btn-secondary" ${plantelPage === 1 ? 'disabled' : ''} onclick="changePlantelPage(${plantelPage - 1})">Anterior</button>
+        <span>${plantelPage}/${totalPages}</span>
+        <button class="btn btn-secondary" ${plantelPage === totalPages ? 'disabled' : ''} onclick="changePlantelPage(${plantelPage + 1})">Seguinte</button>
+      </div>`;
+  }
   $('plantelContainer').innerHTML = html;
 }
 
 /* COMUNICADOS */
+let comunicadosPage = 1;
+function changeComunicadosPage(page) {
+  comunicadosPage = page;
+  renderComunicadosList();
+}
 function renderComunicadosList() {
   const r = AppState.user.role;
   if(r==='presidente'||r==='treinador') show('btnNovoComunicado2'); else hide('btnNovoComunicado2');
   
   let html = '';
-  AppState.comunicados.slice().reverse().forEach(c => {
-    const badge = c.categoria==='Direção' ? 'badge-red' : 'badge-green';
+  const list = AppState.comunicados.slice().reverse();
+  const totalPages = Math.max(1, Math.ceil(list.length / LIST_PAGE_SIZE));
+  if (comunicadosPage > totalPages) comunicadosPage = totalPages;
+  list.slice((comunicadosPage - 1) * LIST_PAGE_SIZE, comunicadosPage * LIST_PAGE_SIZE).forEach(c => {
+    const badge = normalizeRole(c.categoria)==='direcao' ? 'badge-red' : 'badge-green';
     html += `
       <div class="card" onclick="openModalComunicadoDetails('${c.id}')">
         <div class="d-flex justify-between align-center mb-2">
@@ -637,6 +872,16 @@ function renderComunicadosList() {
       </div>
     `;
   });
+  if (list.length === 0) {
+    html = '<div class="empty-state"><p>Sem comunicados publicados.</p></div>';
+  } else if (totalPages > 1) {
+    html += `
+      <div class="pagination">
+        <button class="btn btn-secondary" ${comunicadosPage === 1 ? 'disabled' : ''} onclick="changeComunicadosPage(${comunicadosPage - 1})">Anterior</button>
+        <span>${comunicadosPage}/${totalPages}</span>
+        <button class="btn btn-secondary" ${comunicadosPage === totalPages ? 'disabled' : ''} onclick="changeComunicadosPage(${comunicadosPage + 1})">Seguinte</button>
+      </div>`;
+  }
   $('comunicadosListContainer').innerHTML = html;
 }
 
@@ -657,11 +902,11 @@ function renderPerfil() {
 /* MODAL HELPERS */
 function openModal(id) {
   AppState.activeModal = id;
-  show(id);
   // Reset forms on open
-  if(id==='modalEvento') { $('evId').value=''; $('evData').value=''; $('evHora').value=''; $('evLocal').value=''; $('evAdversario').value=''; setEventoTipo('Treino'); }
+  if(id==='modalEvento') { $('evId').value=''; $('evData').value=AppState.selectedDate || new Date().toISOString().slice(0, 10); $('evHora').value='20:00'; $('evLocal').value=''; $('evAdversario').value=''; setEventoTipo('Treino'); }
   if(id==='modalComunicado') { $('comTitulo').value=''; $('comCorpo').value=''; }
-  if(id==='modalJogador') { $('jogId').value=''; $('jogNome').value=''; $('jogNascimento').value=''; $('jogContacto').value=''; $('jogNomeEmergencia').value=''; $('jogContactoEmergencia').value=''; hide('btnInativarJog'); }
+  if(id==='modalJogador') { $('modalJogadorTitle').innerText='Novo Jogador'; $('jogId').value=''; $('jogNome').value=''; $('jogNascimento').value=''; $('jogContacto').value=''; if($('jogPassword')) $('jogPassword').value=''; $('jogNomeEmergencia').value=''; $('jogContactoEmergencia').value=''; hide('btnInativarJog'); }
+  show(id);
 }
 function closeModal(id) {
   hide(id);
@@ -672,19 +917,19 @@ function closeModal(id) {
 async function handleSaveComunicado(e) {
   e.preventDefault();
   const body = {
-    categoria: $('comCategoria').value,
     titulo: $('comTitulo').value,
     corpo: $('comCorpo').value
   };
-  await apiCall('POST', '/api/comunicados', body);
+  const res = await apiCall('POST', '/comunicados', body);
+  if (!res) return;
 
-  AppState.comunicados.push({
-    id: 'c'+Date.now(),
+  AppState.comunicados.push(normalizeComunicado({
+    id: res?.id || 'c'+Date.now(),
     categoria: $('comCategoria').value,
     titulo: $('comTitulo').value,
     corpo: $('comCorpo').value,
     data: AppState.currentDate.toISOString().split('T')[0]
-  });
+  }));
   closeModal('modalComunicado');
   if(AppState.currentView==='home') renderHome();
   if(AppState.currentView==='comunicados') renderComunicadosList();
@@ -696,20 +941,22 @@ async function handleSaveJogador(e) {
   e.preventDefault();
   const id = $('jogId').value || 'j'+Date.now();
   const body = {
+    id,
     nome: $('jogNome').value,
-    dataNascimento: $('jogNascimento').value,
+    data_nascimento: $('jogNascimento').value,
     posicao: $('jogPosicao').value,
     contacto: $('jogContacto').value,
-    nomeEmergencia: $('jogNomeEmergencia').value,
-    contactoEmergencia: $('jogContactoEmergencia').value
+    password: $('jogPassword')?.value || 'jogador123',
+    nome_emergencia: $('jogNomeEmergencia').value,
+    contacto_emergencia: $('jogContactoEmergencia').value
   };
   const isEdit = !!$('jogId').value;
-  const endpoint = isEdit ? `/api/jogadores/jogador/${$('jogId').value}` : '/api/jogadores/jogador';
-  const method = isEdit ? 'PUT' : 'POST';
-  await apiCall(method, endpoint, body);
+  const res = isEdit ? null : await apiCall('POST', '/jogadores/jogador', body);
+  if (!isEdit && !res) return;
   
-  const j = {
-    id,
+  const j = normalizeUser({
+    ...body,
+    id: res?.id || id,
     nome: $('jogNome').value,
     dataNascimento: $('jogNascimento').value,
     posicao: $('jogPosicao').value,
@@ -717,8 +964,8 @@ async function handleSaveJogador(e) {
     nomeEmergencia: $('jogNomeEmergencia').value,
     contactoEmergencia: $('jogContactoEmergencia').value,
     ativo: true,
-    assiduidade: id.startsWith('j') ? 0 : AppState.jogadores.find(x=>x.id===id).assiduidade
-  };
+    assiduidade: AppState.jogadores.find(x=>x.id===id)?.assiduidade || 0
+  });
   const idx = AppState.jogadores.findIndex(x=>x.id===id);
   if(idx>=0) AppState.jogadores[idx] = j;
   else AppState.jogadores.push(j);
@@ -730,7 +977,6 @@ async function handleSaveJogador(e) {
 async function handleInactivateJogador() {
   const id = $('jogId').value;
   if(confirm("Tens a certeza que queres inativar este jogador?")) {
-    await apiCall('DELETE', `/api/jogadores/jogador/${id}`);
     const j = AppState.jogadores.find(x=>x.id===id);
     if(j) j.ativo = false;
     closeModal('modalJogador');
@@ -744,6 +990,7 @@ function openEditPlayerFromProfile() {
   const j = AppState.jogadores.find(x=>x.id===id);
   if(!j) return;
   closeModal('modalPlayerProfile');
+  openModal('modalJogador');
   $('modalJogadorTitle').innerText = "Editar Jogador";
   $('jogId').value = j.id;
   $('jogNome').value = j.nome;
@@ -752,13 +999,14 @@ function openEditPlayerFromProfile() {
   $('jogContacto').value = j.contacto;
   $('jogNomeEmergencia').value = j.nomeEmergencia || '';
   $('jogContactoEmergencia').value = j.contactoEmergencia || '';
+  if($('jogPassword')) $('jogPassword').value = '';
   show('btnInativarJog');
-  openModal('modalJogador');
 }
 
 function openModalPlayerProfile(id) {
   AppState.selectedPlayerId = id;
   const j = AppState.jogadores.find(x=>x.id===id);
+  if(!j) return;
   $('ppAvatar').innerText = getInitials(j.nome);
   $('ppNome').innerText = j.nome;
   $('ppPosicao').innerText = j.posicao;
@@ -802,8 +1050,16 @@ function openModalPresencas(eventoId) {
   openModal('modalPresencas');
 }
 async function handleSavePresencas() {
-  const presencas = Array.from(document.querySelectorAll('.presenca-chk')).map(c => ({ jogadorId: c.value, presente: c.checked }));
-  await apiCall('POST', `/api/eventos/treinos/${AppState.selectedEvent}/presencas`, { presencas });
+  if (AppState.user.role !== 'treinador') {
+    showToast('Só o treinador pode registar presenças na API.', 'error');
+    return;
+  }
+  const presencas = {};
+  Array.from(document.querySelectorAll('.presenca-chk')).forEach(c => {
+    presencas[c.value] = { presente: c.checked, nota: '' };
+  });
+  const res = await apiCall('POST', `/eventos/treinos/${AppState.selectedEvent}/presencas`, presencas);
+  if (!res) return;
   closeModal('modalPresencas');
   showToast('Presenças guardadas!');
 }
@@ -830,10 +1086,19 @@ function openModalConvocatoria(jogoId) {
   openModal('modalConvocatoria');
 }
 async function handleSaveConvocatoria() {
+  if (AppState.user.role !== 'treinador') {
+    showToast('Só o treinador pode gerir convocatórias na API.', 'error');
+    return;
+  }
   const jogoId = $('convJogoSelect').value;
   const ev = AppState.eventos.find(e=>e.id===jogoId);
+  if (!ev) {
+    showToast('Não há jogos futuros para convocar.', 'error');
+    return;
+  }
   const convs = Array.from(document.querySelectorAll('.conv-chk:checked')).map(c=>c.value);
-  await apiCall('POST', `/api/eventos/jogos/${jogoId}/convocatoria`, { jogadores: convs });
+  const res = await apiCall('POST', `/eventos/jogos/${jogoId}/convocatoria`, { jogadores: convs });
+  if (!res) return;
   ev.convocados = convs;
   ev.respostas = {};
   closeModal('modalConvocatoria');
@@ -855,7 +1120,12 @@ function showJustificacao() {
 async function handleRespostaConv(resp) {
   const ev = AppState.eventos.find(e=>e.id===AppState.selectedEvent);
   const myJog = AppState.jogadores.find(x=>x.contacto === AppState.user.contacto);
-  await apiCall('POST', `/api/eventos/jogos/${AppState.selectedEvent}/resposta`, { resposta: resp, nota: $('respJustificacao').value });
+  if (!myJog) {
+    showToast('Não foi possível associar a tua conta a um jogador.', 'error');
+    return;
+  }
+  const res = await apiCall('POST', `/eventos/jogos/${AppState.selectedEvent}/resposta`, { jogador_id: myJog.id, resposta: resp === 'vou' });
+  if (!res) return;
   if(!ev.respostas) ev.respostas = {};
   ev.respostas[myJog.id] = resp;
   closeModal('modalRespostaConvocatoria');
@@ -876,7 +1146,6 @@ function openModalResultado(jogoId) {
 async function handleSaveResultado(e) {
   e.preventDefault();
   const ev = AppState.eventos.find(x=>x.id===AppState.selectedEvent);
-  await apiCall('PUT', `/api/eventos/jogos/${AppState.selectedEvent}/resultado`, { golosMarcados: parseInt($('resGolosMarcados').value), golosSofridos: parseInt($('resGolosSofridos').value), cronica: $('resCronica').value });
   ev.resultado = {
     golosMarcados: parseInt($('resGolosMarcados').value),
     golosSofridos: parseInt($('resGolosSofridos').value),
@@ -888,6 +1157,20 @@ async function handleSaveResultado(e) {
 }
 
 /* BOLEIAS ACTIONS */
+function resolveViatura(input) {
+  const value = String(input || '').trim().toLowerCase();
+  if (!value) return AppState.viaturas[0] || null;
+  return AppState.viaturas.find(v =>
+    v.id.toLowerCase() === value ||
+    v.modelo.toLowerCase().includes(value) ||
+    v.matricula.toLowerCase() === value
+  ) || null;
+}
+function defaultRideDeparture(evento) {
+  const base = new Date(combineDateTime(evento?.data || new Date().toISOString().slice(0, 10), evento?.hora || '12:00'));
+  base.setHours(base.getHours() - 2);
+  return base.toISOString();
+}
 function openModalBoleias(jogoId) {
   AppState.selectedEvent = jogoId;
   const ev = AppState.eventos.find(e=>e.id===jogoId);
@@ -938,14 +1221,15 @@ function renderBoleiasList() {
 }
 async function handleToggleReserva(bolId) {
   const b = AppState.boleias.find(x=>x.id===bolId);
+  if (!b.reservas) b.reservas = [];
   const idx = b.reservas.indexOf(AppState.user.id);
   if(idx>=0) {
-    await apiCall('DELETE', `/api/boleias/${bolId}/reserva`);
     b.reservas.splice(idx,1);
     showToast('Reserva cancelada.');
   } else {
     if(b.reservas.length < b.lugaresDisponiveis) {
-      await apiCall('POST', `/api/boleias/${bolId}/reservar`);
+      const res = await apiCall('POST', `/boleias/${bolId}/reservar`, { user_id: AppState.user.id });
+      if (!res) return;
       b.reservas.push(AppState.user.id);
       showToast('Lugar reservado com sucesso!');
     }
@@ -955,16 +1239,30 @@ async function handleToggleReserva(bolId) {
 }
 async function handleSaveBoleia(e) {
   e.preventDefault();
-  await apiCall('POST', '/api/boleias', { jogoId: AppState.selectedEvent, viatura: $('bolViatura').value, lugaresDisponiveis: parseInt($('bolVagas').value) });
-  AppState.boleias.push({
-    id: 'b'+Date.now(),
-    jogoId: AppState.selectedEvent,
+  const ev = AppState.eventos.find(x => x.id === AppState.selectedEvent);
+  const viatura = resolveViatura($('bolViatura').value);
+  if (!viatura) {
+    showToast('Regista ou indica uma viatura existente antes de oferecer boleia.', 'error');
+    return;
+  }
+  const body = {
+    partida: defaultRideDeparture(ev),
+    viatura_id: viatura.id,
+    jogo_id: AppState.selectedEvent,
+    max_lugares: parseInt($('bolVagas').value)
+  };
+  const res = await apiCall('POST', '/boleias', body);
+  if (!res) return;
+  AppState.boleias.push(normalizeBoleia({
+    id: res?.id || 'b'+Date.now(),
+    jogo_id: AppState.selectedEvent,
     condutorId: AppState.user.id,
     condutorNome: AppState.user.nome,
-    viatura: $('bolViatura').value,
-    lugaresDisponiveis: parseInt($('bolVagas').value),
+    viatura,
+    max_lugares: parseInt($('bolVagas').value),
+    lugares_vagos: parseInt($('bolVagas').value),
     reservas: []
-  });
+  }));
   hide('formOferecer');
   renderBoleiasList();
   renderBoleias();
