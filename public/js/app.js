@@ -43,6 +43,12 @@ function formatDatePT(dateStr) {
   if (Number.isNaN(d.getTime())) return dateStr;
   return d.toLocaleDateString('pt-PT', { day:'2-digit', month:'2-digit', year:'numeric' });
 }
+function formatDateTimePT(value) {
+  if (!value) return '';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleString('pt-PT', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+}
 function getInitials(name) {
   return (name || '?').split(' ').filter(Boolean).slice(0,2).map(n=>n[0]).join('').toUpperCase();
 }
@@ -157,13 +163,15 @@ function normalizeViatura(viatura = {}) {
 }
 function normalizeBoleia(boleia = {}) {
   const viatura = normalizeViatura(boleia.viatura || {});
+  const jogo = boleia.jogo ? normalizeEvent(boleia.jogo) : null;
   const passageiros = Array.isArray(boleia.passageiros) ? boleia.passageiros : [];
   const reservas = passageiros.map(p => String(p?.id ?? p)).filter(Boolean);
   const owner = viatura.proprietario || {};
   return {
     ...boleia,
     id: String(boleia.id ?? `b${Date.now()}`),
-    jogoId: String(boleia.jogoId ?? boleia.jogo_id ?? boleia.jogo?.id ?? ''),
+    jogoId: String(boleia.jogoId ?? boleia.jogo_id ?? jogo?.id ?? ''),
+    jogo,
     condutorId: String(boleia.condutorId ?? owner.id ?? ''),
     condutorNome: boleia.condutorNome || owner.nome || viatura.modelo || 'Condutor',
     viatura: boleia.viaturaLabel || boleia.viaturaNome || viatura.modelo,
@@ -296,6 +304,11 @@ async function ensureDataLoaded() {
   if (boleias) AppState.boleias = asArray(boleias, 'boleias').map(normalizeBoleia);
   if (viaturas) AppState.viaturas = asArray(viaturas, 'viaturas').map(normalizeViatura);
   await loadEventosForMonth(calendarBaseDate());
+  const rideMonths = AppState.boleias
+    .map(b => b.jogo?.data_hora || b.partida)
+    .map(value => value ? new Date(value) : null)
+    .filter(date => date && !Number.isNaN(date.getTime()));
+  await Promise.all(rideMonths.map(date => loadEventosForMonth(date)));
 
   dataLoaded = true;
   saveState();
@@ -578,18 +591,8 @@ function selectDate(dateStr, el) {
       let badge = '';
       if(isCanc) badge = '<span class="badge badge-red ml-2">CANCELADO</span>';
       
-      // Determine actions based on role
-      let clickAction = '';
-      const r = AppState.user.role;
-      if(!isCanc) {
-        if(r==='treinador') {
-          if(e.tipo==='Treino') clickAction = `onclick="openModalPresencas('${e.id}')"`;
-          if(e.tipo==='Jogo') clickAction = `onclick="navigate('jogos')"`;
-        }
-      }
-      
       html += `
-        <div class="card ${isCanc?'':'card-accent-'+(e.tipo==='Jogo'?'red':'green')}" ${clickAction} style="${clickAction?'cursor:pointer;':''} opacity:${isCanc?0.5:1}">
+        <div class="card ${isCanc?'':'card-accent-'+(e.tipo==='Jogo'?'red':'green')}" onclick="openModalEventoDetails('${e.id}')" style="cursor:pointer; opacity:${isCanc?0.5:1}">
           <div class="d-flex justify-between align-center mb-1">
             <div class="d-flex align-center gap-2">
               <span style="font-size:20px;">${icon}</span>
@@ -608,6 +611,59 @@ function selectDate(dateStr, el) {
 }
 
 /* EVENTOS MODAL */
+function eventTitle(evento) {
+  if (!evento) return 'Evento';
+  return evento.tipo === 'Jogo' ? `Jogo vs ${evento.adversario || 'adversário por definir'}` : 'Treino';
+}
+
+function openModalEventoDetails(id) {
+  const ev = AppState.eventos.find(e => e.id === id);
+  if(!ev) return;
+  AppState.selectedEvent = id;
+  $('eventDetailIcon').innerText = ev.tipo === 'Jogo' ? '⚽' : '🏃';
+  $('eventDetailTitle').innerText = eventTitle(ev);
+  $('eventDetailType').innerText = ev.tipo;
+  $('eventDetailDate').innerText = `${formatDatePT(ev.data)}${ev.hora ? ` às ${ev.hora}` : ''}`;
+  $('eventDetailLocal').innerText = ev.local || 'Local por definir';
+  $('eventDetailStatus').innerText = ev.estado || (ev.status === 'cancelado' ? 'Cancelado' : 'Agendado');
+  $('eventDetailAdversarioRow').classList.toggle('hidden', ev.tipo !== 'Jogo');
+  $('eventDetailAdversario').innerText = ev.adversario || 'Por definir';
+  $('eventDetailResultadoRow').classList.toggle('hidden', !ev.resultado);
+  if(ev.resultado) {
+    $('eventDetailResultado').innerText = `${ev.resultado.golosMarcados} - ${ev.resultado.golosSofridos}`;
+  }
+
+  let actions = '';
+  const role = AppState.user.role;
+  if(role === 'presidente' || role === 'treinador') {
+    actions += `<button class="btn btn-secondary" onclick="openEditEvento('${ev.id}')">Editar Evento</button>`;
+  }
+  if(role === 'treinador' && ev.status !== 'cancelado') {
+    if(ev.tipo === 'Treino') actions += `<button class="btn btn-primary" onclick="closeModal('modalEventoDetails'); openModalPresencas('${ev.id}')">Registar Presenças</button>`;
+    if(ev.tipo === 'Jogo') actions += `<button class="btn btn-primary" onclick="closeModal('modalEventoDetails'); openModalConvocatoria('${ev.id}')">Gerir Convocatória</button>`;
+  }
+  if(ev.tipo === 'Jogo') {
+    actions += `<button class="btn btn-secondary" onclick="closeModal('modalEventoDetails'); navigate('jogos')">Ver Jogo</button>`;
+  }
+  $('eventDetailActions').innerHTML = actions || '<p class="text-muted text-center">Sem ações disponíveis para este evento.</p>';
+  openModal('modalEventoDetails');
+}
+
+function openEditEvento(id) {
+  const ev = AppState.eventos.find(e => e.id === id);
+  if(!ev) return;
+  closeModal('modalEventoDetails');
+  openModal('modalEvento');
+  $('modalEventoTitle').innerText = 'Editar Evento';
+  $('evId').value = ev.id;
+  setEventoTipo(ev.tipo);
+  $('evData').value = ev.data || '';
+  $('evHora').value = ev.hora || '';
+  $('evLocal').value = ev.local || '';
+  $('evAdversario').value = ev.adversario || '';
+  $('evStatus').value = ev.status === 'cancelado' ? 'cancelado' : 'ativo';
+}
+
 function setEventoTipo(tipo) {
   $('evTipo').value = tipo;
   $('btnTipoTreino').className = tipo==='Treino' ? 'btn btn-primary' : 'btn btn-secondary';
@@ -756,16 +812,58 @@ function renderJogos() {
 }
 
 /* BOLEIAS */
+function rideFallbackEvent(boleia) {
+  const fromRide = boleia.jogo || {};
+  const data = fromRide.data || toDateInputValue(fromRide.data_hora || boleia.partida);
+  const hora = fromRide.hora || toTimeInputValue(fromRide.data_hora || boleia.partida);
+  return normalizeEvent({
+    ...fromRide,
+    id: boleia.jogoId || fromRide.id,
+    tipo: 'Jogo',
+    data,
+    hora,
+    adversario: fromRide.adversario || 'Jogo associado',
+    local: fromRide.local || 'Local por confirmar',
+    estado: fromRide.estado || 'Agendado'
+  });
+}
+
+function eventForRide(boleia) {
+  return AppState.eventos.find(e => e.id === boleia.jogoId) || rideFallbackEvent(boleia);
+}
+
+function rideGameGroups() {
+  const groups = new Map();
+  const today = new Date().toISOString().split('T')[0];
+  AppState.eventos
+    .filter(e => e.tipo==='Jogo' && e.local.toLowerCase() !== 'campo principal' && e.data >= today)
+    .forEach(e => groups.set(e.id, { event: e, rides: [] }));
+
+  AppState.boleias.forEach(b => {
+    const ev = eventForRide(b);
+    if(!ev?.id) return;
+    if(!groups.has(ev.id)) groups.set(ev.id, { event: ev, rides: [] });
+    const group = groups.get(ev.id);
+    group.event = AppState.eventos.find(e => e.id === ev.id) || group.event;
+    group.rides.push(b);
+  });
+
+  return Array.from(groups.values()).sort((a,b) => {
+    const ad = a.event.data || '';
+    const bd = b.event.data || '';
+    return ad.localeCompare(bd);
+  });
+}
+
 function renderBoleias() {
   const today = new Date().toISOString().split('T')[0];
-  const jogosFora = AppState.eventos.filter(e => e.tipo==='Jogo' && e.local.toLowerCase() !== 'campo principal' && e.data >= today);
+  const jogosFora = rideGameGroups();
   
   let html = '';
   if(jogosFora.length === 0) {
     html = '<div class="empty-state"><div class="empty-icon">🚗</div><p>Não há jogos fora agendados.</p></div>';
   } else {
-    jogosFora.forEach(j => {
-      const bs = AppState.boleias.filter(b => b.jogoId === j.id);
+    jogosFora.forEach(({ event: j, rides: bs }) => {
       let avatHtml = '';
       let vagasTotais = 0;
       bs.forEach(b => {
@@ -774,13 +872,14 @@ function renderBoleias() {
       });
       if(bs.length>0) avatHtml = `<div class="d-flex" style="padding-left:8px;">${avatHtml}</div>`;
       
+      const isPast = j.data && j.data < today;
       html += `
         <div class="card card-accent-red" style="cursor:pointer;" onclick="openModalBoleias('${j.id}')">
           <div class="d-flex justify-between mb-2">
-            <div style="font-weight:700;">vs ${j.adversario}</div>
+            <div style="font-weight:700;">vs ${j.adversario || 'Jogo associado'}</div>
             <div class="text-muted" style="font-size:14px;">${formatDatePT(j.data)}</div>
           </div>
-          <div class="text-muted mb-3" style="font-size:14px;">📍 ${j.local}</div>
+          <div class="text-muted mb-3" style="font-size:14px;">📍 ${j.local || 'Local por confirmar'}${isPast ? ' • Jogo passado' : ''}</div>
           <div class="d-flex justify-between align-center p-2" style="background:var(--color-surface-2);border-radius:8px;">
             ${bs.length===0 ? '<span class="text-muted" style="font-size:14px;">Sem boleias oferecidas.</span>' : `
               <div class="d-flex align-center gap-2">
@@ -903,7 +1002,7 @@ function renderPerfil() {
 function openModal(id) {
   AppState.activeModal = id;
   // Reset forms on open
-  if(id==='modalEvento') { $('evId').value=''; $('evData').value=AppState.selectedDate || new Date().toISOString().slice(0, 10); $('evHora').value='20:00'; $('evLocal').value=''; $('evAdversario').value=''; setEventoTipo('Treino'); }
+  if(id==='modalEvento') { $('modalEventoTitle').innerText='Novo Evento'; $('evId').value=''; $('evData').value=AppState.selectedDate || new Date().toISOString().slice(0, 10); $('evHora').value='20:00'; $('evLocal').value=''; $('evAdversario').value=''; $('evStatus').value='ativo'; setEventoTipo('Treino'); }
   if(id==='modalComunicado') { $('comTitulo').value=''; $('comCorpo').value=''; }
   if(id==='modalJogador') { $('modalJogadorTitle').innerText='Novo Jogador'; $('jogId').value=''; $('jogNome').value=''; $('jogNascimento').value=''; $('jogContacto').value=''; if($('jogPassword')) $('jogPassword').value=''; $('jogNomeEmergencia').value=''; $('jogContactoEmergencia').value=''; hide('btnInativarJog'); }
   show(id);
@@ -1173,9 +1272,10 @@ function defaultRideDeparture(evento) {
 }
 function openModalBoleias(jogoId) {
   AppState.selectedEvent = jogoId;
-  const ev = AppState.eventos.find(e=>e.id===jogoId);
-  $('bolJogoLabel').innerText = `Boleias vs ${ev.adversario}`;
-  $('bolPartidaLabel').innerText = `Partida: Praça da Vila (estimativa - 2h antes)`;
+  const ev = AppState.eventos.find(e=>e.id===jogoId) || eventForRide(AppState.boleias.find(b => b.jogoId === jogoId) || {});
+  $('bolJogoLabel').innerText = `Boleias vs ${ev?.adversario || 'Jogo associado'}`;
+  const ride = AppState.boleias.find(b => b.jogoId === jogoId);
+  $('bolPartidaLabel').innerText = ride?.partida ? `Partida: ${formatDateTimePT(ride.partida)}` : 'Partida: Praça da Vila (estimativa - 2h antes)';
   hide('formOferecer');
   
   renderBoleiasList();
@@ -1272,6 +1372,10 @@ async function handleSaveBoleia(e) {
 /* COMUNICADO DETAIL MODAL (REUSING HTML OR ALERT) */
 function openModalComunicadoDetails(id) {
   const c = AppState.comunicados.find(x=>x.id===id);
-  alert(`COMUNICADO\n${c.titulo}\nData: ${formatDatePT(c.data)}\n\n${c.corpo}`);
-  // In a full app, this would be a proper modal/view.
+  if(!c) return;
+  $('comDetailCategoria').innerText = c.categoria;
+  $('comDetailData').innerText = formatDatePT(c.data);
+  $('comDetailTitulo').innerText = c.titulo;
+  $('comDetailCorpo').innerText = c.corpo;
+  openModal('modalComunicadoDetails');
 }
