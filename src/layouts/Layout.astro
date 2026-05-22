@@ -23,6 +23,12 @@ const { title, showNav = true, activeNav = 'home' } = Astro.props;
         <script is:inline src="/js/app.js"></script>
 	</head>
 	<body>
+  <a class="skip-link" href="#app">Saltar para o conteudo</a>
+  <div class="app-bg" aria-hidden="true">
+      <div class="bg-orb orb-1"></div>
+      <div class="bg-orb orb-2"></div>
+      <div class="bg-orb orb-3"></div>
+  </div>
         <div id="fullLoader" class="full-page-loader hidden">
           <div class="spinner"></div>
           <h2 class="bebas">OS BEIRÕES</h2>
