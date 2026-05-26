@@ -1,0 +1,282 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Os Beirões - Viaturas" showNav={true} activeNav="viaturas">
+  <div class="view active">
+    <div class="d-flex justify-between align-center mb-2">
+      <div>
+        <h2 class="bebas" style="font-size:32px;">VIATURAS</h2>
+        <p class="text-muted">Gestão de viaturas para boleias.</p>
+      </div>
+      <button id="btnNovaViatura" class="btn btn-primary" style="width:auto;padding:0 var(--space-4);">
+        + Registar
+      </button>
+    </div>
+
+    <!-- Barra de pesquisa: apenas para Presidente / Treinador -->
+    <div id="searchContainer" class="hidden mb-4">
+      <input
+        type="text"
+        id="inputProcura"
+        placeholder="Procurar por modelo, matrícula ou proprietário…"
+        class="form-control"
+      />
+    </div>
+
+    <div id="viaturasContainer"></div>
+  </div>
+
+  <!-- Modal: Registar / Editar Viatura -->
+  <div id="modalViatura" class="modal-backdrop">
+    <div class="modal-content">
+      <div class="modal-header">
+        <span id="modalViaturaTitle" class="modal-title">REGISTAR VIATURA</span>
+        <button id="btnFecharModal" class="modal-close" aria-label="Fechar">✕</button>
+      </div>
+
+      <form id="formViatura">
+        <input type="hidden" id="viaId" />
+
+        <div class="form-group">
+          <label for="viaModelo">Modelo / Nome</label>
+          <input type="text" id="viaModelo" required class="form-control" placeholder="Ex: Renault Clio" />
+        </div>
+
+        <div class="form-group">
+          <label for="viaMatricula">Matrícula</label>
+          <input type="text" id="viaMatricula" required class="form-control" placeholder="AA-00-BB" />
+        </div>
+
+        <div class="form-group">
+          <label for="viaLugares">Lugares Totais</label>
+          <input type="number" id="viaLugares" required min="1" max="9" class="form-control" placeholder="5" />
+        </div>
+
+        <div class="modal-actions">
+          <button type="submit" class="btn btn-primary">Guardar</button>
+          <button type="button" id="btnCancelarModal" class="btn btn-secondary">Cancelar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script is:inline>
+    /* ──────────────────────────────────────────
+       HELPERS
+    ────────────────────────────────────────── */
+    function eGestor() {
+      const role = AppState.user?.tipo || AppState.user?.role || '';
+      return ['Presidente', 'Treinador', 'presidente', 'treinador'].includes(role);
+    }
+
+    /* ──────────────────────────────────────────
+       RENDER
+    ────────────────────────────────────────── */
+    function renderViaturas(filtro = '') {
+      const container = $('viaturasContainer');
+      if (!container) return;
+
+      const gestor = eGestor();
+
+      let lista = AppState.viaturas || [];
+
+      // Jogador só vê as suas próprias viaturas
+      if (!gestor) {
+        lista = lista.filter(v => {
+          const propId = v.proprietario?.id ?? v.proprietario?.contacto ?? v.proprietario_id ?? null;
+          return String(propId) === String(AppState.user.id) ||
+                 String(propId) === String(AppState.user.contacto);
+        });
+      }
+
+      // Filtro de pesquisa (apenas gestores)
+      if (filtro && gestor) {
+        const q = filtro.toLowerCase();
+        lista = lista.filter(v =>
+          (v.modelo || '').toLowerCase().includes(q) ||
+          (v.matricula || '').toLowerCase().includes(q) ||
+          (v.proprietario?.nome || '').toLowerCase().includes(q)
+        );
+      }
+
+      if (lista.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">🚗</div>
+            <div style="font-weight:700;margin-bottom:4px;">Nenhuma viatura registada</div>
+            <div class="text-muted" style="font-size:13px;">
+              ${gestor
+                ? 'Ainda não existem viaturas registadas.'
+                : 'Ainda não tens viaturas registadas. Adiciona a tua primeira!'}
+            </div>
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = lista.map(v => {
+        const propNome = v.proprietario?.nome || 'Desconhecido';
+        const lugares = v.lugares_totais ?? v.lugaresTotais ?? '?';
+        const propId = v.proprietario?.id ?? v.proprietario?.contacto ?? v.proprietario_id;
+        const podeEditar = gestor ||
+          String(propId) === String(AppState.user.id) ||
+          String(propId) === String(AppState.user.contacto);
+
+        return `
+          <div class="card mb-3 p-3">
+            <div class="d-flex align-center justify-between">
+              <div class="d-flex align-center gap-3">
+                <div class="avatar" style="width:44px;height:44px;font-size:22px;background:var(--color-surface-2);">🚗</div>
+                <div>
+                  <div style="font-weight:700;font-size:16px;">${v.modelo}</div>
+                  <div style="display:flex;gap:var(--space-2);flex-wrap:wrap;margin-top:4px;">
+                    <span class="badge badge-gray">${v.matricula}</span>
+                    <span class="badge badge-primary">${lugares} lugares</span>
+                    ${gestor ? `<span class="badge badge-yellow">${propNome}</span>` : ''}
+                  </div>
+                </div>
+              </div>
+              ${podeEditar ? `
+                <div class="d-flex gap-2">
+                  <button
+                    onclick="prepararEdicaoViatura('${v.id}')"
+                    class="btn btn-secondary"
+                    style="width:auto;min-height:36px;padding:0 var(--space-3);font-size:13px;"
+                    aria-label="Editar viatura ${v.modelo}"
+                  >✏️</button>
+                  <button
+                    onclick="executarRemocaoViatura('${v.id}')"
+                    class="btn btn-danger"
+                    style="width:auto;min-height:36px;padding:0 var(--space-3);font-size:13px;"
+                    aria-label="Remover viatura ${v.modelo}"
+                  >🗑️</button>
+                </div>` : ''}
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    /* ──────────────────────────────────────────
+       FETCH — usa apiCall de app.js (token em AppState.user.token)
+    ────────────────────────────────────────── */
+    async function atualizarListaViaturas() {
+      const data = await apiCall('GET', '/viaturas');
+      if (data) {
+        // O backend devolve um dicionário { id: {...}, ... }
+        AppState.viaturas = Object.keys(data).map(id => normalizeViatura({ id, ...data[id] }));
+        saveState();
+      }
+      renderViaturas($('inputProcura')?.value || '');
+    }
+
+    /* ──────────────────────────────────────────
+       ACTIONS
+    ────────────────────────────────────────── */
+    window.prepararEdicaoViatura = function(id) {
+      const v = AppState.viaturas.find(x => x.id === id);
+      if (!v) return;
+      $('modalViaturaTitle').innerText = 'EDITAR VIATURA';
+      $('viaId').value = v.id;
+      $('viaModelo').value = v.modelo;
+      $('viaMatricula').value = v.matricula;
+      $('viaLugares').value = v.lugares_totais ?? v.lugaresTotais ?? '';
+      show('modalViatura');
+    };
+
+    window.executarRemocaoViatura = async function(id) {
+      if (!confirm('Aviso: Eliminar esta viatura irá cancelar automaticamente todas as ofertas de boleia associadas! Deseja continuar?')) return;
+      const res = await apiCall('DELETE', `/viaturas?viatura=${id}`);
+      if (res !== null) {
+        showToast('Viatura e boleias associadas removidas com sucesso!');
+        await atualizarListaViaturas();
+      }
+    };
+
+    /* ──────────────────────────────────────────
+       FORM SUBMIT
+    ────────────────────────────────────────── */
+    $('formViatura').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const viaIdExistente = $('viaId').value;
+
+      const payload = {
+        id: viaIdExistente || 'v_' + Date.now(),
+        modelo: $('viaModelo').value.trim(),
+        matricula: $('viaMatricula').value.trim(),
+        lugares_totais: parseInt($('viaLugares').value),
+        proprietario_id: AppState.user.id || AppState.user.contacto
+      };
+
+      const res = await apiCall('POST', '/viaturas', payload);
+      if (res !== null) {
+        hide('modalViatura');
+        showToast(viaIdExistente ? 'Viatura atualizada!' : 'Viatura registada com sucesso!');
+        await atualizarListaViaturas();
+      }
+    });
+
+    /* ──────────────────────────────────────────
+       MODAL CONTROLS
+    ────────────────────────────────────────── */
+    $('btnNovaViatura').addEventListener('click', () => {
+      $('modalViaturaTitle').innerText = 'REGISTAR VIATURA';
+      $('formViatura').reset();
+      $('viaId').value = '';
+      show('modalViatura');
+    });
+
+    function fecharModal() { hide('modalViatura'); }
+    $('btnFecharModal').addEventListener('click', fecharModal);
+    $('btnCancelarModal').addEventListener('click', fecharModal);
+    $('modalViatura').addEventListener('click', (e) => {
+      if (e.target === $('modalViatura')) fecharModal();
+    });
+
+    /* ──────────────────────────────────────────
+       SEARCH
+    ────────────────────────────────────────── */
+    $('inputProcura').addEventListener('input', (e) => {
+      renderViaturas(e.target.value);
+    });
+
+    /* ──────────────────────────────────────────
+       INIT
+    ────────────────────────────────────────── */
+    async function initGestaoViaturas() {
+      if (!AppState.user) {
+        window.location.href = '/';
+        return;
+      }
+
+      if (eGestor()) show('searchContainer');
+
+      // Se o AppState ainda não tem dados (navegação direta para /viaturas,
+      // ou página recarregada), ensureDataLoaded() trata de tudo:
+      // autentica, carrega viaturas do servidor e guarda no localStorage.
+      // Se já tem dados (regresso de outra página), renderiza de imediato
+      // e vai buscar dados frescos em segundo plano.
+      if (!AppState.viaturas || AppState.viaturas.length === 0) {
+        await ensureDataLoaded();
+      } else {
+        renderViaturas();
+        atualizarListaViaturas(); // segundo plano, sem await
+      }
+
+      renderViaturas();
+    }
+
+    // Usar astro:page-load para garantir que corre após ViewTransitions
+    document.addEventListener('astro:page-load', () => {
+      if (document.getElementById('viaturasContainer')) {
+        initGestaoViaturas();
+      }
+    });
+
+    // Fallback para navegação normal sem ViewTransitions
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initGestaoViaturas);
+    } else {
+      initGestaoViaturas();
+    }
+  </script>
+</Layout>

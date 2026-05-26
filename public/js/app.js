@@ -1262,47 +1262,126 @@ async function handleSaveResultado(e) {
 }
 
 /* BOLEIAS ACTIONS */
-function resolveViatura(input) {
-  const value = String(input || '').trim().toLowerCase();
-  if (!value) return AppState.viaturas[0] || null;
-  return AppState.viaturas.find(v =>
-    v.id.toLowerCase() === value ||
-    v.modelo.toLowerCase().includes(value) ||
-    v.matricula.toLowerCase() === value
-  ) || null;
-}
 function defaultRideDeparture(evento) {
   const base = new Date(combineDateTime(evento?.data || new Date().toISOString().slice(0, 10), evento?.hora || '12:00'));
   base.setHours(base.getHours() - 2);
   return base.toISOString();
 }
+
+// Devolve as viaturas que pertencem ao utilizador atual
+function getMinhasViaturas() {
+  const uid = AppState.user?.id || AppState.user?.contacto;
+  return (AppState.viaturas || []).filter(v => {
+    const propId = v.proprietario?.id ?? v.proprietario?.contacto ?? v.proprietario_id;
+    return String(propId) === String(uid);
+  });
+}
+
 function openModalBoleias(jogoId) {
   AppState.selectedEvent = jogoId;
   const ev = AppState.eventos.find(e=>e.id===jogoId) || eventForRide(AppState.boleias.find(b => b.jogoId === jogoId) || {});
   $('bolJogoLabel').innerText = `Boleias vs ${ev?.adversario || 'Jogo associado'}`;
   const ride = AppState.boleias.find(b => b.jogoId === jogoId);
   $('bolPartidaLabel').innerText = ride?.partida ? `Partida: ${formatDateTimePT(ride.partida)}` : 'Partida: Praça da Vila (estimativa - 2h antes)';
+
+  // Preencher o seletor de viaturas do utilizador
+  const minhasViaturas = getMinhasViaturas();
+  const selectEl = $('bolViaturaSelect');
+  const semViaturaMsg = $('bolSemViatura');
+  const formOferecer = $('formOferecer');
+
+  if (selectEl) {
+    if (minhasViaturas.length === 0) {
+      // Sem viaturas — esconder o form e mostrar aviso
+      if (semViaturaMsg) show('bolSemViatura');
+      selectEl.innerHTML = '';
+      selectEl.parentElement.classList.add('hidden');
+    } else {
+      // Esconder aviso de sem viatura
+      if (semViaturaMsg) hide('bolSemViatura');
+      selectEl.parentElement.classList.remove('hidden');
+
+      // Preencher opções
+      selectEl.innerHTML = minhasViaturas.map(v =>
+        `<option value="${v.id}">${v.modelo} — ${v.matricula} (${v.lugares_totais} lugares)</option>`
+      ).join('');
+
+      // Se só tem uma viatura, selecionar automaticamente e atualizar lugares máximos
+      if (minhasViaturas.length === 1) {
+        selectEl.value = minhasViaturas[0].id;
+        atualizarMaxLugares(minhasViaturas[0]);
+      }
+    }
+  }
+
   hide('formOferecer');
-  
   renderBoleiasList();
   openModal('modalBoleia');
 }
+
+// Atualiza o max do input de vagas consoante a viatura selecionada
+function atualizarMaxLugares(viatura) {
+  const vagasEl = $('bolVagas');
+  if (!vagasEl || !viatura) return;
+  const max = Math.max(1, (viatura.lugares_totais || 5) - 1); // -1 para o condutor
+  vagasEl.max = max;
+  if (!vagasEl.value || parseInt(vagasEl.value) > max) vagasEl.value = max;
+}
+
+// Handler para quando o utilizador muda a viatura selecionada
+window.handleBolViaturaChange = function() {
+  const selectEl = $('bolViaturaSelect');
+  if (!selectEl) return;
+  const viatura = AppState.viaturas.find(v => v.id === selectEl.value);
+  atualizarMaxLugares(viatura);
+};
 function renderBoleiasList() {
+  const uid = AppState.user.id;
   const bs = AppState.boleias.filter(b => b.jogoId === AppState.selectedEvent);
+
+  // O utilizador já está como passageiro nalguma boleia deste jogo?
+  const jaTemReserva = bs.some(b =>
+    b.condutorId !== uid && b.reservas.includes(uid)
+  );
+  // O utilizador já é condutor neste jogo?
+  const jaECondutor = bs.some(b => b.condutorId === uid);
+
+  // Mostrar/esconder o botão "Oferecer Boleia" consoante o estado
+  const btnOferecer = $('btnOferecer');
+  if (btnOferecer) {
+    if (jaTemReserva) {
+      btnOferecer.disabled = true;
+      btnOferecer.title = 'Já tens um lugar reservado numa boleia para este jogo.';
+      btnOferecer.style.opacity = '0.45';
+      btnOferecer.style.cursor = 'not-allowed';
+    } else {
+      btnOferecer.disabled = false;
+      btnOferecer.title = '';
+      btnOferecer.style.opacity = '';
+      btnOferecer.style.cursor = '';
+    }
+  }
+
   let html = '';
   if(bs.length===0) {
     html = '<div class="text-center text-muted my-4 py-4">Nenhuma viatura disponível ainda.</div>';
   } else {
     bs.forEach(b => {
-      const isReserved = b.reservas.includes(AppState.user.id);
+      const isReserved = b.reservas.includes(uid);
       let btnHtml = '';
-      if(b.condutorId === AppState.user.id) {
+      if(b.condutorId === uid) {
         btnHtml = `<span class="badge badge-primary">O teu carro</span>`;
       } else if(isReserved) {
         btnHtml = `<button class="btn btn-secondary" style="height:36px;font-size:12px;width:auto;" onclick="handleToggleReserva('${b.id}')">Cancelar Reserva</button>`;
       } else {
         const full = b.reservas.length >= b.lugaresDisponiveis;
-        btnHtml = `<button class="btn btn-primary" style="height:36px;font-size:12px;width:auto;" ${full?'disabled':''} onclick="handleToggleReserva('${b.id}')">${full?'Lotado':'Reservar Lugar'}</button>`;
+        // Desabilitar "Reservar" se já tem reserva noutro carro
+        btnHtml = `<button class="btn btn-primary" style="height:36px;font-size:12px;width:auto;"
+          ${full || jaTemReserva ? 'disabled' : ''}
+          ${jaTemReserva && !full ? 'title="Já tens lugar reservado neste jogo."' : ''}
+          onclick="handleToggleReserva('${b.id}')">
+          ${full ? 'Lotado' : 'Reservar Lugar'}
+        </button>`;
       }
       
       const vL = b.lugaresDisponiveis - b.reservas.length;
@@ -1346,11 +1425,17 @@ async function handleToggleReserva(bolId) {
 async function handleSaveBoleia(e) {
   e.preventDefault();
   const ev = AppState.eventos.find(x => x.id === AppState.selectedEvent);
-  const viatura = resolveViatura($('bolViatura').value);
+
+  // Obter viatura pelo select (substituiu o campo de texto livre)
+  const selectEl = $('bolViaturaSelect');
+  const viaturaId = selectEl?.value;
+  const viatura = AppState.viaturas.find(v => v.id === viaturaId);
+
   if (!viatura) {
-    showToast('Regista ou indica uma viatura existente antes de oferecer boleia.', 'error');
+    showToast('Regista uma viatura em teu nome antes de oferecer boleia.', 'error');
     return;
   }
+
   const body = {
     partida: defaultRideDeparture(ev),
     viatura_id: viatura.id,

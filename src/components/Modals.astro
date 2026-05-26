@@ -261,30 +261,74 @@
 </div>
 
 <!-- Modal Boleia Detail -->
+<!-- ═══════════════════════════════════════════════════
+     MODAL BOLEIAS  —  substituir o bloco id="modalBoleia"
+     no teu Layout.astro
+════════════════════════════════════════════════════ -->
 <div id="modalBoleia" class="modal-backdrop">
   <div class="modal-content">
     <div class="modal-header">
-      <div class="modal-title" id="bolJogoLabel">Boleias</div>
-      <button class="modal-close" onclick="closeModal('modalBoleia')"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      <span id="bolJogoLabel" class="modal-title">BOLEIAS</span>
+      <button class="modal-close" onclick="closeModal('modalBoleia')">✕</button>
     </div>
-    <p class="text-muted mb-4" id="bolPartidaLabel">Partida: Praça da Vila, 13:00</p>
-    
+
+    <!-- Hora de partida estimada -->
+    <div id="bolPartidaLabel" class="text-muted mb-4" style="font-size:13px;"></div>
+
+    <!-- Lista de boleias disponíveis para este jogo -->
     <div id="bolListContainer"></div>
-    
-    <div id="bolOferecerDiv" class="mt-4 pt-4" style="border-top:1px solid var(--color-border);">
-      <button class="btn btn-secondary mb-2" id="btnToggleOferecer" onclick="document.getElementById('formOferecer').classList.toggle('hidden')">Oferecer Boleia</button>
-      <form id="formOferecer" class="hidden" onsubmit="handleSaveBoleia(event)">
-        <div class="form-group">
-          <label>Vagas Livres</label>
-          <input type="number" id="bolVagas" class="form-control" required min="1" max="8" value="3">
-        </div>
-        <div class="form-group">
-          <label>Viatura (Opcional)</label>
-          <input type="text" id="bolViatura" class="form-control" placeholder="Ex: Clio Azul">
-        </div>
-        <button type="submit" class="btn btn-primary">Guardar</button>
-      </form>
+
+    <!-- Botão para abrir o form de oferecer boleia -->
+    <button
+      id="btnOferecer"
+      class="btn btn-primary mt-4"
+      onclick="show('formOferecer')"
+    >🚗 Oferecer Boleia</button>
+
+    <!-- Aviso quando o utilizador não tem viaturas registadas -->
+    <div id="bolSemViatura" class="hidden mt-4" style="
+      background: rgba(249,115,22,0.1);
+      border: 1px solid rgba(249,115,22,0.3);
+      border-radius: var(--radius-md);
+      padding: var(--space-3) var(--space-4);
+      font-size: 14px;
+      color: var(--color-accent);
+      font-weight: 600;
+    ">
+      ⚠️ Não tens nenhuma viatura registada em teu nome.
+      <a href="/viaturas" style="color:var(--color-primary);margin-left:4px;">Registar viatura →</a>
     </div>
+
+    <!-- Formulário de oferecer boleia -->
+    <form id="formOferecer" class="hidden mt-4" onsubmit="handleSaveBoleia(event)">
+
+      <!-- Seletor de viatura — preenchido dinamicamente por openModalBoleias() -->
+      <div class="form-group" id="bolViaturaGroup">
+        <label for="bolViaturaSelect">A tua viatura</label>
+        <select id="bolViaturaSelect" class="form-control" onchange="handleBolViaturaChange()">
+          <!-- opções injetadas via JS -->
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="bolVagas">Vagas disponíveis</label>
+        <input
+          type="number"
+          id="bolVagas"
+          class="form-control"
+          min="1"
+          max="8"
+          value="4"
+          required
+        />
+      </div>
+
+      <div class="modal-actions">
+        <button type="submit" class="btn btn-primary">Confirmar Boleia</button>
+        <button type="button" class="btn btn-secondary" onclick="hide('formOferecer')">Cancelar</button>
+      </div>
+    </form>
+
   </div>
 </div>
 
