@@ -152,7 +152,7 @@ function normalizeComunicado(comunicado = {}) {
   };
 }
 function normalizeViatura(viatura = {}) {
-  return {
+  const v = {
     ...viatura,
     id: String(viatura.id ?? viatura.matricula ?? `v${Date.now()}`),
     modelo: viatura.modelo || 'Viatura',
@@ -160,6 +160,7 @@ function normalizeViatura(viatura = {}) {
     lugares_totais: Number(viatura.lugares_totais ?? viatura.lugaresTotais ?? 0),
     proprietario: viatura.proprietario || null
   };
+  return v
 }
 function normalizeBoleia(boleia = {}) {
   const viatura = normalizeViatura(boleia.viatura || {});
@@ -173,7 +174,7 @@ function normalizeBoleia(boleia = {}) {
     jogoId: String(boleia.jogoId ?? boleia.jogo_id ?? jogo?.id ?? ''),
     jogo,
     condutorId: String(boleia.condutorId ?? owner.id ?? ''),
-    condutorNome: boleia.condutorNome || owner.nome || viatura.modelo || 'Condutor',
+    condutorNome: owner.nome || boleia.condutorNome || viatura.modelo || 'Condutor',
     viatura: boleia.viaturaLabel || boleia.viaturaNome || viatura.modelo,
     viaturaId: boleia.viatura_id || viatura.id,
     lugaresDisponiveis: Number(boleia.lugaresDisponiveis ?? boleia.max_lugares ?? boleia.lugares_vagos ?? 0),
@@ -294,7 +295,7 @@ async function ensureDataLoaded() {
   ]);
 
   if (comunicados) AppState.comunicados = asArray(comunicados, 'comunicados').map(normalizeComunicado);
-  if (jogadores) {
+  if (jogadores && !Object.hasOwn(jogadores,'msg') ) {
     const allUsers = asArray(jogadores, 'jogadores').map(normalizeUser);
     AppState.users = allUsers;
     AppState.jogadores = allUsers.filter(u => u.role === 'jogador');
@@ -743,8 +744,8 @@ function renderJogos() {
       
       if(r==='jogador') {
         // Find player ID for this user (mock match by name/phone in real app)
-        const myJog = AppState.jogadores.find(x=>x.contacto === AppState.user.contacto);
-        if(myJog && j.convocados.includes(myJog.id)) {
+        // const myJog = AppState.jogadores.find(x=>x.contacto === AppState.user.contacto);
+        if(j.convocados.includes(myJog.id)) {
           const resp = j.respostas?.[myJog.id];
           if(!resp) {
             btnHtml = `<button class="btn btn-primary mt-2" onclick="openModalResposta('${j.id}')">RESPONDER À CONVOCATÓRIA</button>`;
