@@ -716,6 +716,11 @@ function switchJogosTab(tab) {
     hide('btnNovaConvocatoria');
   }
 }
+
+function debug_this(data){
+  openModal('modalDebug');
+  document.getElementById('debugOutput').textContent = JSON.stringify(data, null, 2);
+}
 function renderJogos() {
   switchJogosTab('convocatorias');
   
@@ -734,7 +739,7 @@ function renderJogos() {
     let convStatus = '';
     let btnHtml = '';
     const r = AppState.user.role;
-    
+
     if(!j.convocados || j.convocados.length===0) {
       convStatus = '<span class="badge badge-gray">Aguardar Convocatória</span>';
       if(r==='treinador') btnHtml = `<button class="btn btn-secondary mt-2" style="height:36px;font-size:14px;" onclick="openModalConvocatoria('${j.id}')">Criar Convocatória</button>`;
@@ -744,7 +749,7 @@ function renderJogos() {
       
       if(r==='jogador') {
         // Find player ID for this user (mock match by name/phone in real app)
-        // const myJog = AppState.jogadores.find(x=>x.contacto === AppState.user.contacto);
+        const myJog = AppState.jogadores.find(x=>x.contacto === AppState.user.contacto);
         if(j.convocados.includes(myJog.id)) {
           const resp = j.respostas?.[myJog.id];
           if(!resp) {

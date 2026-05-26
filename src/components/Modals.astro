@@ -315,3 +315,37 @@
   </div>
 </div>
 </div>
+
+<div id="modalDebug" class="modal-backdrop">
+  <div class="modal-content" style="max-width: 900px; width: 95%;">
+    <div class="modal-header">
+      <div class="modal-title">Debug Output</div>
+      <button class="modal-close" onclick="closeModal('modalDebug')">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"/>
+          <line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="mb-2 d-flex gap-2">
+      <button class="btn btn-secondary" onclick="copyDebugOutput()">Copy</button>
+      <button class="btn btn-danger" onclick="clearDebugOutput()">Clear</button>
+    </div>
+
+    <pre id="debugOutput"
+      style="
+        background: #111;
+        color: #0f0;
+        padding: 16px;
+        border-radius: 8px;
+        max-height: 500px;
+        overflow: auto;
+        font-size: 13px;
+        white-space: pre-wrap;
+        word-break: break-word;
+      ">
+No debug data yet...
+    </pre>
+  </div>
+</div>
