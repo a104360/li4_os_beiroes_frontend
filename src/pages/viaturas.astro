@@ -193,54 +193,9 @@ import Layout from '../layouts/Layout.astro';
     };
 
     /* ──────────────────────────────────────────
-       FORM SUBMIT
-    ────────────────────────────────────────── */
-    $('formViatura').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const viaIdExistente = $('viaId').value;
-
-      const payload = {
-        id: viaIdExistente || 'v_' + Date.now(),
-        modelo: $('viaModelo').value.trim(),
-        matricula: $('viaMatricula').value.trim(),
-        lugares_totais: parseInt($('viaLugares').value),
-        proprietario_id: AppState.user.id || AppState.user.contacto
-      };
-
-      const res = await apiCall('POST', '/viaturas', payload);
-      if (res !== null) {
-        hide('modalViatura');
-        showToast(viaIdExistente ? 'Viatura atualizada!' : 'Viatura registada com sucesso!');
-        await atualizarListaViaturas();
-      }
-    });
-
-    /* ──────────────────────────────────────────
-       MODAL CONTROLS
-    ────────────────────────────────────────── */
-    $('btnNovaViatura').addEventListener('click', () => {
-      $('modalViaturaTitle').innerText = 'REGISTAR VIATURA';
-      $('formViatura').reset();
-      $('viaId').value = '';
-      show('modalViatura');
-    });
-
-    function fecharModal() { hide('modalViatura'); }
-    $('btnFecharModal').addEventListener('click', fecharModal);
-    $('btnCancelarModal').addEventListener('click', fecharModal);
-    $('modalViatura').addEventListener('click', (e) => {
-      if (e.target === $('modalViatura')) fecharModal();
-    });
-
-    /* ──────────────────────────────────────────
-       SEARCH
-    ────────────────────────────────────────── */
-    $('inputProcura').addEventListener('input', (e) => {
-      renderViaturas(e.target.value);
-    });
-
-    /* ──────────────────────────────────────────
-       INIT
+       INIT — tudo dentro desta função para que
+       o astro:page-load re-anexe os listeners
+       em cada navegação (ViewTransitions)
     ────────────────────────────────────────── */
     async function initGestaoViaturas() {
       if (!AppState.user) {
@@ -250,29 +205,68 @@ import Layout from '../layouts/Layout.astro';
 
       if (eGestor()) show('searchContainer');
 
-      // Se o AppState ainda não tem dados (navegação direta para /viaturas,
-      // ou página recarregada), ensureDataLoaded() trata de tudo:
-      // autentica, carrega viaturas do servidor e guarda no localStorage.
-      // Se já tem dados (regresso de outra página), renderiza de imediato
-      // e vai buscar dados frescos em segundo plano.
+      // Dados: renderizar imediatamente do cache, refrescar em segundo plano
       if (!AppState.viaturas || AppState.viaturas.length === 0) {
         await ensureDataLoaded();
       } else {
         renderViaturas();
         atualizarListaViaturas(); // segundo plano, sem await
       }
-
       renderViaturas();
+
+      /* ── Listeners — re-attached on every page-load ── */
+
+      // Abrir modal de nova viatura
+      $('btnNovaViatura').addEventListener('click', () => {
+        $('modalViaturaTitle').innerText = 'REGISTAR VIATURA';
+        $('formViatura').reset();
+        $('viaId').value = '';
+        show('modalViatura');
+      });
+
+      // Fechar modal
+      function fecharModal() { hide('modalViatura'); }
+      $('btnFecharModal').addEventListener('click', fecharModal);
+      $('btnCancelarModal').addEventListener('click', fecharModal);
+      $('modalViatura').addEventListener('click', (e) => {
+        if (e.target === $('modalViatura')) fecharModal();
+      });
+
+      // Submit do formulário
+      $('formViatura').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const viaIdExistente = $('viaId').value;
+
+        const payload = {
+          id: viaIdExistente || 'v_' + Date.now(),
+          modelo: $('viaModelo').value.trim(),
+          matricula: $('viaMatricula').value.trim(),
+          lugares_totais: parseInt($('viaLugares').value),
+          proprietario_id: AppState.user.id || AppState.user.contacto
+        };
+
+        const res = await apiCall('POST', '/viaturas', payload);
+        if (res !== null) {
+          hide('modalViatura');
+          showToast(viaIdExistente ? 'Viatura atualizada!' : 'Viatura registada com sucesso!');
+          await atualizarListaViaturas();
+        }
+      });
+
+      // Pesquisa (apenas gestores)
+      $('inputProcura').addEventListener('input', (e) => {
+        renderViaturas(e.target.value);
+      });
     }
 
-    // Usar astro:page-load para garantir que corre após ViewTransitions
+    // astro:page-load cobre ViewTransitions (regresso de outra página)
     document.addEventListener('astro:page-load', () => {
       if (document.getElementById('viaturasContainer')) {
         initGestaoViaturas();
       }
     });
 
-    // Fallback para navegação normal sem ViewTransitions
+    // Fallback para carregamento direto sem ViewTransitions
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', initGestaoViaturas);
     } else {
