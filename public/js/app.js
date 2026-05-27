@@ -652,14 +652,14 @@ function openModalEventoDetails(id) {
 
 function openEditEvento(id) {
   const ev = AppState.eventos.find(e => e.id === id);
-  if(!ev) return;
+  if (!ev) return;
   closeModal('modalEventoDetails');
   openModal('modalEvento');
   $('modalEventoTitle').innerText = 'Editar Evento';
   $('evId').value = ev.id;
   setEventoTipo(ev.tipo);
-  $('evData').value = ev.data || '';
-  $('evHora').value = ev.hora || '';
+  $('evData').value = toDateInputValue(ev.data_hora || ev.data);
+  $('evHora').value = toTimeInputValue(ev.data_hora || ev.hora);
   $('evLocal').value = ev.local || '';
   $('evAdversario').value = ev.adversario || '';
   $('evStatus').value = ev.status === 'cancelado' ? 'cancelado' : 'ativo';
@@ -678,20 +678,28 @@ async function handleSaveEvento(e) {
   const time = $('evHora').value;
   const body = {
     tipo: $('evTipo').value,
-    data_hora: combineDateTime(date, time),
+    // data_hora: combineDateTime(date, time),
+    data:date,
+    hora:time,
     local: $('evLocal').value,
-    adversario: $('evTipo').value==='Jogo' ? $('evAdversario').value : undefined
+    estado: $('evStatus').value === 'cancelado' ? 'Cancelado' : 'Agendado', // ← adicionar
+    adversario: $('evTipo').value === 'Jogo' ? $('evAdversario').value : undefined
   };
   const isEdit = !!$('evId').value;
-  const res = isEdit ? null : await apiCall('POST', '/eventos', body);
-  if (!isEdit && !res) return;
+  let res;
+  if (isEdit) {
+    res = await apiCall('PUT', `/eventos/${id}`, body);
+  } else {
+    res = await apiCall('POST', '/eventos', body);
+  }
+  if (!res) return;
   
   const ev = normalizeEvent({
     ...body,
-    id,
     id: res?.id || id,
     estado: $('evStatus').value === 'cancelado' ? 'Cancelado' : 'Agendado'
   });
+
   const idx = AppState.eventos.findIndex(x=>x.id===id);
   if(idx>=0) AppState.eventos[idx] = ev;
   else AppState.eventos.push(ev);

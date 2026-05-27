@@ -10,8 +10,8 @@
     </div>
     <form onsubmit="handleSaveEvento(event)">
       <div class="d-flex gap-2 mb-4">
-        <button type="button" class="btn btn-secondary" id="btnTipoTreino" onclick="setEventoTipo('Treino')" style="flex:1;">Treino</button>
-        <button type="button" class="btn btn-secondary" id="btnTipoJogo" onclick="setEventoTipo('Jogo')" style="flex:1;">Jogo</button>
+        <button type="button" class="btn btn-secondary btn-tipo" id="btnTipoTreino" onclick="setEventoTipo('Treino')">Treino</button>
+        <button type="button" class="btn btn-secondary btn-tipo" id="btnTipoJogo" onclick="setEventoTipo('Jogo')">Jogo</button>
       </div>
       <input type="hidden" id="evTipo" value="Treino">
       <input type="hidden" id="evId" value="">
@@ -33,7 +33,7 @@
       </div>
       <div class="form-group">
         <label>Estado</label>
-        <select id="evStatus" class="form-control">
+        <select id="evStatus" class="form-control form-select">
           <option value="ativo">Ativo</option>
           <option value="cancelado">Cancelado</option>
         </select>
@@ -51,8 +51,8 @@
       <button class="modal-close" onclick="closeModal('modalEventoDetails')"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
     <div class="text-center mb-4">
-      <div style="font-size:40px;" id="eventDetailIcon">📅</div>
-      <h3 id="eventDetailTitle" style="font-size:24px;margin-top:8px;"></h3>
+      <div class="modal-detail-icon" id="eventDetailIcon">📅</div>
+      <h3 id="eventDetailTitle" class="modal-detail-title"></h3>
       <div class="badge badge-gray" id="eventDetailType"></div>
     </div>
     <div class="detail-list">
@@ -95,7 +95,7 @@
       </div>
       <div class="form-group">
         <label>Categoria</label>
-        <select id="comCategoria" class="form-control">
+        <select id="comCategoria" class="form-control form-select">
           <option value="Direção">Direção</option>
           <option value="Equipa Técnica">Equipa Técnica</option>
         </select>
@@ -118,10 +118,10 @@
     </div>
     <div class="d-flex justify-between align-center mb-4">
       <span class="badge badge-gray" id="comDetailCategoria"></span>
-      <span class="text-muted" style="font-size:13px;" id="comDetailData"></span>
+      <span class="text-muted modal-meta-date" id="comDetailData"></span>
     </div>
-    <h3 id="comDetailTitulo" style="font-size:22px;margin-bottom:12px;"></h3>
-    <p id="comDetailCorpo" class="text-muted" style="font-size:15px;line-height:1.6;white-space:pre-wrap;"></p>
+    <h3 id="comDetailTitulo" class="modal-detail-title"></h3>
+    <p id="comDetailCorpo" class="text-muted modal-detail-body"></p>
   </div>
 </div>
 
@@ -144,7 +144,7 @@
       </div>
       <div class="form-group">
         <label>Posição *</label>
-        <select id="jogPosicao" class="form-control" required>
+        <select id="jogPosicao" class="form-control form-select" required>
           <option value="Guarda-Redes">Guarda-Redes</option>
           <option value="Defesa Central">Defesa Central</option>
           <option value="Defesa Lateral">Defesa Lateral</option>
@@ -161,7 +161,7 @@
         <label>Password inicial</label>
         <input type="text" id="jogPassword" class="form-control" placeholder="jogador123">
       </div>
-      <h3 class="mt-4 mb-2" style="font-size:16px;">Contactos de Emergência</h3>
+      <h3 class="section-label mt-4 mb-2">Contactos de Emergência</h3>
       <div class="form-group">
         <label>Nome do Contacto *</label>
         <input type="text" id="jogNomeEmergencia" class="form-control" required>
@@ -199,7 +199,7 @@
     </div>
     <div class="form-group">
       <label>Selecionar Jogo</label>
-      <select id="convJogoSelect" class="form-control"></select>
+      <select id="convJogoSelect" class="form-control form-select"></select>
     </div>
     <label class="d-block mb-2 font-weight-bold">Selecionar Jogadores</label>
     <div id="convJogadoresList"></div>
@@ -242,13 +242,13 @@
     <h3 class="mb-4" id="resJogoLabel"></h3>
     <form onsubmit="handleSaveResultado(event)">
       <div class="d-flex gap-4 mb-4">
-        <div class="form-group" style="flex:1;">
+        <div class="form-group form-group-flex">
           <label class="text-center">Golos Os Beirões</label>
-          <input type="number" id="resGolosMarcados" class="form-control text-center" style="font-size:24px;font-weight:bold;" required min="0">
+          <input type="number" id="resGolosMarcados" class="form-control text-center form-control-lg" required min="0">
         </div>
-        <div class="form-group" style="flex:1;">
+        <div class="form-group form-group-flex">
           <label class="text-center">Golos Adversário</label>
-          <input type="number" id="resGolosSofridos" class="form-control text-center" style="font-size:24px;font-weight:bold;" required min="0">
+          <input type="number" id="resGolosSofridos" class="form-control text-center form-control-lg" required min="0">
         </div>
       </div>
       <div class="form-group">
@@ -273,7 +273,7 @@
     </div>
 
     <!-- Hora de partida estimada -->
-    <div id="bolPartidaLabel" class="text-muted mb-4" style="font-size:13px;"></div>
+    <div id="bolPartidaLabel" class="text-muted modal-meta-date mb-4"></div>
 
     <!-- Lista de boleias disponíveis para este jogo -->
     <div id="bolListContainer"></div>
@@ -286,17 +286,9 @@
     >🚗 Oferecer Boleia</button>
 
     <!-- Aviso quando o utilizador não tem viaturas registadas -->
-    <div id="bolSemViatura" class="hidden mt-4" style="
-      background: rgba(249,115,22,0.1);
-      border: 1px solid rgba(249,115,22,0.3);
-      border-radius: var(--radius-md);
-      padding: var(--space-3) var(--space-4);
-      font-size: 14px;
-      color: var(--color-accent);
-      font-weight: 600;
-    ">
+    <div id="bolSemViatura" class="hidden mt-4 alert-warning">
       ⚠️ Não tens nenhuma viatura registada em teu nome.
-      <a href="/viaturas" style="color:var(--color-primary);margin-left:4px;">Registar viatura →</a>
+      <a href="/viaturas" class="link-primary ml-1">Registar viatura →</a>
     </div>
 
     <!-- Formulário de oferecer boleia -->
@@ -305,7 +297,7 @@
       <!-- Seletor de viatura — preenchido dinamicamente por openModalBoleias() -->
       <div class="form-group" id="bolViaturaGroup">
         <label for="bolViaturaSelect">A tua viatura</label>
-        <select id="bolViaturaSelect" class="form-control" onchange="handleBolViaturaChange()">
+        <select id="bolViaturaSelect" class="form-control form-select" onchange="handleBolViaturaChange()">
           <!-- opções injetadas via JS -->
         </select>
       </div>
@@ -341,13 +333,13 @@
     </div>
     <div class="text-center">
       <div class="avatar avatar-lg mb-2" id="ppAvatar"></div>
-      <h3 id="ppNome" style="font-size:24px;"></h3>
+      <h3 id="ppNome" class="modal-detail-title"></h3>
       <div class="badge badge-gray mb-2" id="ppPosicao"></div>
       <p class="text-muted mb-4" id="ppAssiduidade"></p>
     </div>
     
-    <div id="ppEmergencySection" class="hidden" style="border-top:1px solid var(--color-border);padding-top:var(--space-4);">
-      <h3 style="font-size:16px;">Contacto de Emergência</h3>
+    <div id="ppEmergencySection" class="hidden modal-emergency-section">
+      <h3 class="section-label">Contacto de Emergência</h3>
       <p id="ppEmergenciaNome" class="text-muted"></p>
       <a href="#" id="ppEmergenciaCall" class="emergency-btn">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
@@ -361,7 +353,7 @@
 </div>
 
 <div id="modalDebug" class="modal-backdrop">
-  <div class="modal-content" style="max-width: 900px; width: 95%;">
+  <div class="modal-content modal-content-wide">
     <div class="modal-header">
       <div class="modal-title">Debug Output</div>
       <button class="modal-close" onclick="closeModal('modalDebug')">
@@ -377,19 +369,6 @@
       <button class="btn btn-danger" onclick="clearDebugOutput()">Clear</button>
     </div>
 
-    <pre id="debugOutput"
-      style="
-        background: #111;
-        color: #0f0;
-        padding: 16px;
-        border-radius: 8px;
-        max-height: 500px;
-        overflow: auto;
-        font-size: 13px;
-        white-space: pre-wrap;
-        word-break: break-word;
-      ">
-No debug data yet...
-    </pre>
+    <pre id="debugOutput" class="debug-output">No debug data yet...</pre>
   </div>
 </div>
