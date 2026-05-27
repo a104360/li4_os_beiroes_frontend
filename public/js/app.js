@@ -213,7 +213,7 @@ async function fakeNetworkDelay() {
 }
 
 /* API CALL */
-const API_BASE = window.OS_BEIROES_API_BASE || localStorage.getItem('osbeiroes_api_base') || 'http://localhost:8080';//|| 'https://api.osbeiroes.cc';
+const API_BASE = window.OS_BEIROES_API_BASE || localStorage.getItem('osbeiroes_api_base') || 'https://api.osbeiroes.cc';
 
 function apiEndpoint(endpoint) {
   return endpoint;
