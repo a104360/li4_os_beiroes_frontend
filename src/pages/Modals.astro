@@ -1,0 +1,374 @@
+---
+---
+<div id='modalsContainer'>
+<!-- Modal Evento -->
+<div id="modalEvento" class="modal-backdrop">
+  <div class="modal-content">
+    <div class="modal-header">
+      <div class="modal-title" id="modalEventoTitle">Novo Evento</div>
+      <button class="modal-close" onclick="closeModal('modalEvento')"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <form onsubmit="handleSaveEvento(event)">
+      <div class="d-flex gap-2 mb-4">
+        <button type="button" class="btn btn-secondary btn-tipo" id="btnTipoTreino" onclick="setEventoTipo('Treino')">Treino</button>
+        <button type="button" class="btn btn-secondary btn-tipo" id="btnTipoJogo" onclick="setEventoTipo('Jogo')">Jogo</button>
+      </div>
+      <input type="hidden" id="evTipo" value="Treino">
+      <input type="hidden" id="evId" value="">
+      <div class="form-group">
+        <label>Data</label>
+        <input type="date" id="evData" class="form-control" required>
+      </div>
+      <div class="form-group">
+        <label>Hora</label>
+        <input type="time" id="evHora" class="form-control" required>
+      </div>
+      <div class="form-group">
+        <label>Local</label>
+        <input type="text" id="evLocal" class="form-control" required placeholder="Ex: Campo Principal">
+      </div>
+      <div class="form-group hidden" id="fgAdversario">
+        <label>Adversário</label>
+        <input type="text" id="evAdversario" class="form-control" placeholder="Nome da equipa">
+      </div>
+      <div class="form-group">
+        <label>Estado</label>
+        <select id="evStatus" class="form-control form-select">
+          <option value="ativo">Ativo</option>
+          <option value="cancelado">Cancelado</option>
+        </select>
+      </div>
+      <button type="submit" class="btn btn-primary mt-2">Guardar Evento</button>
+    </form>
+  </div>
+</div>
+
+<!-- Modal Detalhe Evento -->
+<div id="modalEventoDetails" class="modal-backdrop modal-center">
+  <div class="modal-content modal-content-center">
+    <div class="modal-header">
+      <div class="modal-title">Detalhe do Evento</div>
+      <button class="modal-close" onclick="closeModal('modalEventoDetails')"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="text-center mb-4">
+      <div class="modal-detail-icon" id="eventDetailIcon">📅</div>
+      <h3 id="eventDetailTitle" class="modal-detail-title"></h3>
+      <div class="badge badge-gray" id="eventDetailType"></div>
+    </div>
+    <div class="detail-list">
+      <div class="detail-row">
+        <span>Data</span>
+        <strong id="eventDetailDate"></strong>
+      </div>
+      <div class="detail-row">
+        <span>Local</span>
+        <strong id="eventDetailLocal"></strong>
+      </div>
+      <div class="detail-row">
+        <span>Estado</span>
+        <strong id="eventDetailStatus"></strong>
+      </div>
+      <div class="detail-row hidden" id="eventDetailAdversarioRow">
+        <span>Adversário</span>
+        <strong id="eventDetailAdversario"></strong>
+      </div>
+      <div class="detail-row hidden" id="eventDetailResultadoRow">
+        <span>Resultado</span>
+        <strong id="eventDetailResultado"></strong>
+      </div>
+    </div>
+    <div class="modal-actions" id="eventDetailActions"></div>
+  </div>
+</div>
+
+<!-- Modal Comunicado -->
+<div id="modalComunicado" class="modal-backdrop">
+  <div class="modal-content">
+    <div class="modal-header">
+      <div class="modal-title">Novo Comunicado</div>
+      <button class="modal-close" onclick="closeModal('modalComunicado')"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <form onsubmit="handleSaveComunicado(event)">
+      <div class="form-group">
+        <label>Título</label>
+        <input type="text" id="comTitulo" class="form-control" required>
+      </div>
+      <div class="form-group">
+        <label>Categoria</label>
+        <select id="comCategoria" class="form-control form-select">
+          <option value="Direção">Direção</option>
+          <option value="Equipa Técnica">Equipa Técnica</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Corpo do Comunicado</label>
+        <textarea id="comCorpo" class="form-control" rows="5" required></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary mt-2">Publicar</button>
+    </form>
+  </div>
+</div>
+
+<!-- Modal Detalhe Comunicado -->
+<div id="modalComunicadoDetails" class="modal-backdrop modal-center">
+  <div class="modal-content modal-content-center">
+    <div class="modal-header">
+      <div class="modal-title">Comunicado</div>
+      <button class="modal-close" onclick="closeModal('modalComunicadoDetails')"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="d-flex justify-between align-center mb-4">
+      <span class="badge badge-gray" id="comDetailCategoria"></span>
+      <span class="text-muted modal-meta-date" id="comDetailData"></span>
+    </div>
+    <h3 id="comDetailTitulo" class="modal-detail-title"></h3>
+    <p id="comDetailCorpo" class="text-muted modal-detail-body"></p>
+  </div>
+</div>
+
+<!-- Modal Jogador -->
+<div id="modalJogador" class="modal-backdrop">
+  <div class="modal-content">
+    <div class="modal-header">
+      <div class="modal-title" id="modalJogadorTitle">Novo Jogador</div>
+      <button class="modal-close" onclick="closeModal('modalJogador')"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <form onsubmit="handleSaveJogador(event)">
+      <input type="hidden" id="jogId">
+      <div class="form-group">
+        <label>Nome Completo *</label>
+        <input type="text" id="jogNome" class="form-control" required>
+      </div>
+      <div class="form-group">
+        <label>Data de Nascimento *</label>
+        <input type="date" id="jogNascimento" class="form-control" required>
+      </div>
+      <div class="form-group">
+        <label>Posição *</label>
+        <select id="jogPosicao" class="form-control form-select" required>
+          <option value="Guarda-Redes">Guarda-Redes</option>
+          <option value="Defesa Central">Defesa Central</option>
+          <option value="Defesa Lateral">Defesa Lateral</option>
+          <option value="Médio">Médio</option>
+          <option value="Extremo">Extremo</option>
+          <option value="Avançado">Avançado</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Contacto Telefónico *</label>
+        <input type="tel" id="jogContacto" class="form-control" required>
+      </div>
+      <div class="form-group">
+        <label>Password inicial</label>
+        <input type="text" id="jogPassword" class="form-control" placeholder="jogador123">
+      </div>
+      <h3 class="section-label mt-4 mb-2">Contactos de Emergência</h3>
+      <div class="form-group">
+        <label>Nome do Contacto *</label>
+        <input type="text" id="jogNomeEmergencia" class="form-control" required>
+      </div>
+      <div class="form-group">
+        <label>Telefone de Emergência *</label>
+        <input type="tel" id="jogContactoEmergencia" class="form-control" required>
+      </div>
+      
+      <button type="submit" class="btn btn-primary mt-4">Guardar</button>
+      <button type="button" class="btn btn-danger mt-2 hidden" id="btnInativarJog" onclick="handleInactivateJogador()">Inativar Jogador</button>
+    </form>
+  </div>
+</div>
+
+<!-- Modal Presenças -->
+<div id="modalPresencas" class="modal-backdrop">
+  <div class="modal-content">
+    <div class="modal-header">
+      <div class="modal-title">Registar Presenças</div>
+      <button class="modal-close" onclick="closeModal('modalPresencas')"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="text-muted mb-4">Treino de <span id="presencasDataLabel"></span></div>
+    <div id="presencasList"></div>
+    <button class="btn btn-primary mt-4" onclick="handleSavePresencas()">Guardar Presenças</button>
+  </div>
+</div>
+
+<!-- Modal Convocatória -->
+<div id="modalConvocatoria" class="modal-backdrop">
+  <div class="modal-content">
+    <div class="modal-header">
+      <div class="modal-title">Nova Convocatória</div>
+      <button class="modal-close" onclick="closeModal('modalConvocatoria')"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="form-group">
+      <label>Selecionar Jogo</label>
+      <select id="convJogoSelect" class="form-control form-select"></select>
+    </div>
+    <label class="d-block mb-2 font-weight-bold">Selecionar Jogadores</label>
+    <div id="convJogadoresList"></div>
+    <button class="btn btn-primary mt-4" onclick="handleSaveConvocatoria()">Criar Convocatória</button>
+  </div>
+</div>
+
+<!-- Modal Resposta Convocatória -->
+<div id="modalRespostaConvocatoria" class="modal-backdrop">
+  <div class="modal-content">
+    <div class="modal-header">
+      <div class="modal-title">Responder à Convocatória</div>
+      <button class="modal-close" onclick="closeModal('modalRespostaConvocatoria')"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <h3 class="mb-2" id="respJogoLabel"></h3>
+    <p class="text-muted mb-4">Confirma a tua presença neste jogo.</p>
+    
+    <div class="d-flex flex-column gap-4">
+      <button class="btn btn-huge btn-vou" onclick="handleRespostaConv('vou')">✅ VOU</button>
+      <button class="btn btn-huge btn-naovou" onclick="showJustificacao()">❌ NÃO VOU</button>
+    </div>
+    
+    <div id="divJustificacao" class="hidden mt-4">
+      <div class="form-group">
+        <label>Justificação (Opcional)</label>
+        <input type="text" id="respJustificacao" class="form-control" placeholder="Motivo...">
+      </div>
+      <button class="btn btn-danger" onclick="handleRespostaConv('naovou')">Confirmar Indisponibilidade</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Resultado -->
+<div id="modalResultado" class="modal-backdrop">
+  <div class="modal-content">
+    <div class="modal-header">
+      <div class="modal-title">Registar Resultado</div>
+      <button class="modal-close" onclick="closeModal('modalResultado')"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <h3 class="mb-4" id="resJogoLabel"></h3>
+    <form onsubmit="handleSaveResultado(event)">
+      <div class="d-flex gap-4 mb-4">
+        <div class="form-group form-group-flex">
+          <label class="text-center">Golos Os Beirões</label>
+          <input type="number" id="resGolosMarcados" class="form-control text-center form-control-lg" required min="0">
+        </div>
+        <div class="form-group form-group-flex">
+          <label class="text-center">Golos Adversário</label>
+          <input type="number" id="resGolosSofridos" class="form-control text-center form-control-lg" required min="0">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Crónica do Jogo (Opcional)</label>
+        <textarea id="resCronica" class="form-control" rows="4" placeholder="Resumo do jogo..."></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary mt-2">Guardar Resultado</button>
+    </form>
+  </div>
+</div>
+
+<!-- Modal Boleia Detail -->
+<!-- ═══════════════════════════════════════════════════
+     MODAL BOLEIAS  —  substituir o bloco id="modalBoleia"
+     no teu Layout.astro
+════════════════════════════════════════════════════ -->
+<div id="modalBoleia" class="modal-backdrop">
+  <div class="modal-content">
+    <div class="modal-header">
+      <span id="bolJogoLabel" class="modal-title">BOLEIAS</span>
+      <button class="modal-close" onclick="closeModal('modalBoleia')">✕</button>
+    </div>
+
+    <!-- Hora de partida estimada -->
+    <div id="bolPartidaLabel" class="text-muted modal-meta-date mb-4"></div>
+
+    <!-- Lista de boleias disponíveis para este jogo -->
+    <div id="bolListContainer"></div>
+
+    <!-- Botão para abrir o form de oferecer boleia -->
+    <button
+      id="btnOferecer"
+      class="btn btn-primary mt-4"
+      onclick="show('formOferecer')"
+    >🚗 Oferecer Boleia</button>
+
+    <!-- Aviso quando o utilizador não tem viaturas registadas -->
+    <div id="bolSemViatura" class="hidden mt-4 alert-warning">
+      ⚠️ Não tens nenhuma viatura registada em teu nome.
+      <a href="/viaturas" class="link-primary ml-1">Registar viatura →</a>
+    </div>
+
+    <!-- Formulário de oferecer boleia -->
+    <form id="formOferecer" class="hidden mt-4" onsubmit="handleSaveBoleia(event)">
+
+      <!-- Seletor de viatura — preenchido dinamicamente por openModalBoleias() -->
+      <div class="form-group" id="bolViaturaGroup">
+        <label for="bolViaturaSelect">A tua viatura</label>
+        <select id="bolViaturaSelect" class="form-control form-select" onchange="handleBolViaturaChange()">
+          <!-- opções injetadas via JS -->
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="bolVagas">Vagas disponíveis</label>
+        <input
+          type="number"
+          id="bolVagas"
+          class="form-control"
+          min="1"
+          max="8"
+          value="4"
+          required
+        />
+      </div>
+
+      <div class="modal-actions">
+        <button type="submit" class="btn btn-primary">Confirmar Boleia</button>
+        <button type="button" class="btn btn-secondary" onclick="hide('formOferecer')">Cancelar</button>
+      </div>
+    </form>
+
+  </div>
+</div>
+
+<!-- Modal Player Profile (Read/Call) -->
+<div id="modalPlayerProfile" class="modal-backdrop">
+  <div class="modal-content">
+    <div class="modal-header">
+      <div class="modal-title">Perfil do Jogador</div>
+      <button class="modal-close" onclick="closeModal('modalPlayerProfile')"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="text-center">
+      <div class="avatar avatar-lg mb-2" id="ppAvatar"></div>
+      <h3 id="ppNome" class="modal-detail-title"></h3>
+      <div class="badge badge-gray mb-2" id="ppPosicao"></div>
+      <p class="text-muted mb-4" id="ppAssiduidade"></p>
+    </div>
+    
+    <div id="ppEmergencySection" class="hidden modal-emergency-section">
+      <h3 class="section-label">Contacto de Emergência</h3>
+      <p id="ppEmergenciaNome" class="text-muted"></p>
+      <a href="#" id="ppEmergenciaCall" class="emergency-btn">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+        Ligar
+      </a>
+    </div>
+    
+    <button class="btn btn-secondary mt-4 hidden" id="ppEditBtn" onclick="openEditPlayerFromProfile()">Editar Dados</button>
+  </div>
+</div>
+</div>
+
+<div id="modalDebug" class="modal-backdrop">
+  <div class="modal-content modal-content-wide">
+    <div class="modal-header">
+      <div class="modal-title">Debug Output</div>
+      <button class="modal-close" onclick="closeModal('modalDebug')">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"/>
+          <line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="mb-2 d-flex gap-2">
+      <button class="btn btn-secondary" onclick="copyDebugOutput()">Copy</button>
+      <button class="btn btn-danger" onclick="clearDebugOutput()">Clear</button>
+    </div>
+
+    <pre id="debugOutput" class="debug-output">No debug data yet...</pre>
+  </div>
+</div>

@@ -6,10 +6,10 @@ import Layout from '../layouts/Layout.astro';
   <div class="view active">
     <div class="d-flex justify-between align-center mb-2">
       <div>
-        <h2 class="bebas" style="font-size:32px;">VIATURAS</h2>
+        <h2 class="page-title no-mb">Viaturas</h2>
         <p class="text-muted">Gestão de viaturas para boleias.</p>
       </div>
-      <button id="btnNovaViatura" class="btn btn-primary" style="width:auto;padding:0 var(--space-4);">
+      <button id="btnNovaViatura" class="btn btn-primary btn-auto">
         + Registar
       </button>
     </div>
@@ -104,8 +104,8 @@ import Layout from '../layouts/Layout.astro';
         container.innerHTML = `
           <div class="empty-state">
             <div class="empty-icon">🚗</div>
-            <div style="font-weight:700;margin-bottom:4px;">Nenhuma viatura registada</div>
-            <div class="text-muted" style="font-size:13px;">
+            <div class="empty-state-title">Nenhuma viatura registada</div>
+            <div class="text-muted empty-state-desc">
               ${gestor
                 ? 'Ainda não existem viaturas registadas.'
                 : 'Ainda não tens viaturas registadas. Adiciona a tua primeira!'}
@@ -126,10 +126,10 @@ import Layout from '../layouts/Layout.astro';
           <div class="card mb-3 p-3">
             <div class="d-flex align-center justify-between">
               <div class="d-flex align-center gap-3">
-                <div class="avatar" style="width:44px;height:44px;font-size:22px;background:var(--color-surface-2);">🚗</div>
+                <div class="avatar avatar-emoji">🚗</div>
                 <div>
-                  <div style="font-weight:700;font-size:16px;">${v.modelo}</div>
-                  <div style="display:flex;gap:var(--space-2);flex-wrap:wrap;margin-top:4px;">
+                  <div class="card-item-title">${v.modelo}</div>
+                  <div class="badge-row">
                     <span class="badge badge-gray">${v.matricula}</span>
                     <span class="badge badge-primary">${lugares} lugares</span>
                     ${gestor ? `<span class="badge badge-yellow">${propNome}</span>` : ''}
@@ -140,14 +140,12 @@ import Layout from '../layouts/Layout.astro';
                 <div class="d-flex gap-2">
                   <button
                     onclick="prepararEdicaoViatura('${v.id}')"
-                    class="btn btn-secondary"
-                    style="width:auto;min-height:36px;padding:0 var(--space-3);font-size:13px;"
+                    class="btn btn-secondary btn-sm"
                     aria-label="Editar viatura ${v.modelo}"
                   >✏️</button>
                   <button
                     onclick="executarRemocaoViatura('${v.id}')"
-                    class="btn btn-danger"
-                    style="width:auto;min-height:36px;padding:0 var(--space-3);font-size:13px;"
+                    class="btn btn-danger btn-sm"
                     aria-label="Remover viatura ${v.modelo}"
                   >🗑️</button>
                 </div>` : ''}
@@ -259,18 +257,10 @@ import Layout from '../layouts/Layout.astro';
       });
     }
 
-    // astro:page-load cobre ViewTransitions (regresso de outra página)
     document.addEventListener('astro:page-load', () => {
-      if (document.getElementById('viaturasContainer')) {
-        initGestaoViaturas();
-      }
+      if (document.getElementById('viaturasContainer')) initGestaoViaturas();
     });
-
-    // Fallback para carregamento direto sem ViewTransitions
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', initGestaoViaturas);
-    } else {
+    if (document.readyState !== 'loading' && document.getElementById('viaturasContainer'))
       initGestaoViaturas();
-    }
   </script>
 </Layout>

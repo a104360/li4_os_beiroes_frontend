@@ -6,12 +6,12 @@ import Layout from '../layouts/Layout.astro';
   <div class="view active">
     <div class="d-flex align-center gap-2 mb-4">
       <button class="icon-btn" onclick="navigate('perfil')"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
-      <h2 class="bebas" style="font-size:32px;margin-top:4px;">GESTÃO DO PLANTEL</h2>
+      <h2 class="page-title no-mb">Gestão do Plantel</h2>
     </div>
     
-    <div class="form-group relative" style="position:relative;display:inline-block;width:100%;">
-      <input type="text" id="searchJogador" class="form-control" style="padding-left:40px;" placeholder="Procurar jogador..." oninput="renderPlantel()">
-      <svg style="position:absolute;left:12px;top:13px;color:var(--color-text-muted);" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <div class="form-group input-search-wrapper">
+      <svg class="input-search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" id="searchJogador" class="form-control with-icon" placeholder="Procurar jogador..." oninput="renderPlantel()">
     </div>
     
     <div id="plantelContainer"></div>
