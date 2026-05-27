@@ -1,4 +1,3 @@
-
 @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Sora:wght@400;500;600;700&display=swap');
 
 :root {
@@ -51,7 +50,7 @@ body {
 
 h1, h2, h3, .bebas { font-family: 'Bebas Neue', sans-serif; letter-spacing: 1px; }
 
-#app { max-width: 640px; margin: 0 auto; position: relative; max-height: 100vh; }
+#app { max-width: 640px; margin: 0 auto; position: relative; min-height: 100vh; }
 .view { padding: var(--space-4); animation: slideUpFade 0.35s cubic-bezier(0.16, 1, 0.3, 1); }
 
 .app-bg {
@@ -288,3 +287,263 @@ h1, h2, h3, .bebas { font-family: 'Bebas Neue', sans-serif; letter-spacing: 1px;
   transition: transform 0.2s;
 }
 .skip-link:focus { transform: translateY(0); }
+
+
+/* ═══════════════════════════════════════════════════════════
+   SHARED LAYOUT — applies at all sizes
+   app-shell  = sidebar + app-body (header + main)
+   app-no-nav = login / register pages (no sidebar)
+═══════════════════════════════════════════════════════════ */
+
+/* Login / register: centred column, no sidebar */
+.app-no-nav {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding-top: var(--space-6);
+}
+.app-no-nav > * {
+  width: 100%;
+  max-width: 480px;
+}
+
+/* ── Mobile default (bottom nav) ───────────────────────── */
+body { padding-bottom: 80px; } /* room for bottom nav */
+
+.app-shell {
+  display: block; /* mobile: stacked */
+}
+
+/* Sidebar logo — hidden on mobile, sidebar acts as bottom nav */
+.sidebar-logo { display: none; }
+
+/* The .sidebar IS the bottom-nav on mobile — keep existing styles */
+.sidebar {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: var(--color-surface);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: row;
+  justify-content: space-around;
+  padding: var(--space-2) 0;
+  padding-bottom: calc(var(--space-2) + env(safe-area-inset-bottom));
+  z-index: 20;
+  box-shadow: 0 -4px 20px rgba(0,0,0,0.03);
+}
+
+/* app-body: no special treatment on mobile */
+.app-body {
+  display: block;
+}
+
+/* #app keeps existing mobile styles */
+
+/* ═══════════════════════════════════════════════════════════
+   DESKTOP — ≥ 900px
+   Sidebar becomes a vertical left rail.
+   app-shell  → flex row
+   app-body   → flex column (header on top, main below)
+═══════════════════════════════════════════════════════════ */
+@media (min-width: 900px) {
+
+  body {
+    padding-bottom: 0;
+    overflow-x: hidden;
+  }
+
+  /* ── Shell: sidebar left + body right ─────────────────── */
+  .app-shell {
+    display: flex;
+    flex-direction: row;
+    min-height: 100vh;
+  }
+
+  /* ── Sidebar ───────────────────────────────────────────── */
+  .sidebar {
+    /* override mobile fixed/bottom positioning */
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    width: 220px;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: stretch;
+    padding: 0;
+    border-top: none;
+    border-right: 1px solid var(--color-border);
+    border-bottom: none;
+    box-shadow: 2px 0 16px rgba(0,0,0,0.04);
+    overflow-y: auto;
+    z-index: 20;
+  }
+
+  /* Sidebar logo strip */
+  .sidebar-logo {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    height: 64px;
+    padding: 0 var(--space-5);
+    border-bottom: 1px solid var(--color-border);
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    letter-spacing: 1px;
+    color: var(--color-primary);
+    flex-shrink: 0;
+  }
+  .sidebar-logo svg {
+    width: 28px; height: 28px;
+    fill: var(--color-primary);
+    flex-shrink: 0;
+  }
+
+  /* Nav items: horizontal → vertical */
+  .nav-item {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: var(--space-3);
+    padding: 14px var(--space-5);
+    min-width: unset;
+    min-height: 48px;
+    font-size: 14px;
+    border-radius: 0;
+    border-left: 3px solid transparent;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .nav-item:hover {
+    background: rgba(15, 118, 110, 0.07);
+    color: var(--color-primary);
+    transform: none;
+  }
+  .nav-item.active {
+    border-left-color: var(--color-primary);
+    background: rgba(15, 118, 110, 0.1);
+    color: var(--color-primary);
+  }
+  .nav-item.active svg { transform: none; stroke-width: 2; }
+  .nav-item svg { width: 20px; height: 20px; flex-shrink: 0; }
+
+  /* ── App body (header + main) ──────────────────────────── */
+  .app-body {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    margin-left: 220px;
+    min-height: 100vh;
+  }
+
+  /* ── Header ────────────────────────────────────────────── */
+  .app-header {
+    position: sticky;
+    top: 0;
+    z-index: 15;
+    /* header-title visible again (shows brand in header too) */
+  }
+
+  /* ── Main content area ─────────────────────────────────── */
+  #app {
+    max-width: none;
+    margin: 0;
+    flex: 1;
+  }
+
+  .view {
+    max-width: 1060px;
+    margin: 0 auto;
+    padding: var(--space-8);
+  }
+
+  /* Login/register page: still centred, just with more breathing room */
+  .app-no-nav {
+    padding-top: var(--space-8);
+  }
+  .app-no-nav > * {
+    max-width: 480px;
+  }
+
+  /* ── FAB ───────────────────────────────────────────────── */
+  .btn-fab {
+    right: var(--space-8);
+    bottom: var(--space-8);
+  }
+
+  /* ── Two-column card grids ─────────────────────────────── */
+  .cards-grid,
+  #boleiasContainer,
+  #viaturasContainer,
+  #comunicadosContainer,
+  #plantelContainer {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-4);
+    align-items: start;
+  }
+  .cards-grid > .card,
+  #boleiasContainer > .card,
+  #viaturasContainer > .card,
+  #comunicadosContainer > .card,
+  #plantelContainer > .card { margin-bottom: 0; }
+  .cards-grid > .empty-state,
+  #boleiasContainer > .empty-state,
+  #viaturasContainer > .empty-state,
+  #comunicadosContainer > .empty-state,
+  #plantelContainer > .empty-state { grid-column: 1 / -1; }
+
+  /* ── Calendar ──────────────────────────────────────────── */
+  .calendar-day { min-height: 68px; font-size: 15px; }
+
+  /* ── Modals: centered dialog, no bottom-sheet ─────────── */
+  .modal-backdrop {
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-6);
+  }
+  .modal-content {
+    border-radius: var(--radius-lg);
+    max-width: 560px;
+    width: 100%;
+    max-height: 88vh;
+    animation: scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .modal-actions {
+    flex-direction: row;
+    justify-content: flex-end;
+  }
+  .modal-actions .btn { width: auto; min-width: 120px; }
+
+  /* ── Toast: top-right corner ───────────────────────────── */
+  .toast-container {
+    left: auto;
+    right: var(--space-6);
+    top: var(--space-5);
+    transform: none;
+    max-width: 360px;
+    width: auto;
+  }
+
+  /* ── Background orbs ───────────────────────────────────── */
+  .bg-orb.orb-1 { width: 500px; height: 500px; top: -180px; left: 160px; }
+  .bg-orb.orb-2 { width: 420px; height: 420px; top: 60px; right: -80px; }
+  .bg-orb.orb-3 { width: 560px; height: 560px; bottom: -200px; left: 40%; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   WIDE DESKTOP — ≥ 1280px
+═══════════════════════════════════════════════════════════ */
+@media (min-width: 1280px) {
+  .sidebar { width: 240px; }
+  .app-body { margin-left: 240px; }
+  .view { max-width: 1200px; padding: var(--space-8) 48px; }
+
+  #plantelContainer {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  
+  #bottomNav{
+    flex-direction: column;
+
+  }
+}
