@@ -1360,6 +1360,8 @@ function renderBoleiasList() {
     btnOferecer.style.cursor = bloqueado ? 'not-allowed' : '';
   }
 
+  const offeringRide = userIsOfferingRide(AppState.selectedEvent);
+
   let html = '';
   if(bs.length===0) {
     html = '<div class="text-center text-muted my-4 py-4">Nenhuma viatura disponível ainda.</div>';
@@ -1368,14 +1370,14 @@ function renderBoleiasList() {
       const isReserved = b.reservas.includes(uid);
       let btnHtml = '';
       if(b.condutorId === uid) {
-        btnHtml = `<span class="badge badge-primary">O teu carro</span>`;
+        btnHtml = `<span class="badge badge-primary" style="white-space:nowrap;">O teu carro</span>`;
       } else if(isReserved) {
         btnHtml = `<button class="btn btn-secondary" style="height:36px;font-size:12px;width:auto;" onclick="handleToggleReserva('${b.id}')">Cancelar Reserva</button>`;
       } else {
         const full = b.reservas.length >= b.lugaresDisponiveis;
         // Desabilitar "Reservar" se já tem reserva noutro carro
         btnHtml = `<button class="btn btn-primary" style="height:36px;font-size:12px;width:auto;"
-          ${full || jaTemReserva ? 'disabled' : ''}
+          ${full || jaTemReserva || offeringRide? 'disabled' : ''}
           ${jaTemReserva && !full ? 'title="Já tens lugar reservado neste jogo."' : ''}
           onclick="handleToggleReserva('${b.id}')">
           ${full ? 'Lotado' : 'Reservar Lugar'}
@@ -1383,7 +1385,8 @@ function renderBoleiasList() {
       }
       
       const vL = b.lugaresDisponiveis - b.reservas.length;
-      
+      const isOwner = b.condutorId === AppState.user.id;
+
       html += `
         <div class="card mb-3 p-3">
           <div class="d-flex align-center justify-between">
@@ -1395,6 +1398,20 @@ function renderBoleiasList() {
               </div>
             </div>
             ${btnHtml}
+            
+            ${
+              jaECondutor && isOwner
+                ? `
+                  <button
+                    class="btn btn-danger"
+                    style="width:auto;min-height:40px;padding:0 12px;"
+                    onclick="handleCancelarBoleia('${b.id}')"
+                  >
+                    Cancelar
+                  </button>
+                `
+                : ''
+            }      
           </div>
         </div>
       `;
@@ -1467,4 +1484,48 @@ function openModalComunicadoDetails(id) {
   $('comDetailTitulo').innerText = c.titulo;
   $('comDetailCorpo').innerText = c.corpo;
   openModal('modalComunicadoDetails');
+}
+
+async function handleCancelarBoleia(id) {
+  const boleia = AppState.boleias.find(b => b.id === id);
+
+  if (!boleia) {
+    showToast('Boleia não encontrada.', 'error');
+    return;
+  }
+
+  // Segurança extra
+  if (boleia.condutorId !== AppState.user.id) {
+    showToast('Só podes cancelar as tuas próprias boleias.', 'error');
+    return;
+  }
+
+  const confirmDelete = confirm('Queres cancelar esta boleia?');
+  if (!confirmDelete) return;
+
+  const res = await apiCall('DELETE', `/boleias/${id}`);
+
+  if (!res) return;
+
+  AppState.boleias = AppState.boleias.filter(b => b.id !== id);
+
+  saveState();
+
+  if (AppState.currentView === 'boleias') {
+    renderBoleias();
+  }
+
+  if (AppState.selectedEvent) {
+    openModalBoleias(AppState.selectedEvent);
+  }
+
+  showToast('Boleia cancelada.');
+}
+
+function userIsOfferingRide(jogoId) {
+  return AppState.boleias.some(
+    b =>
+      b.jogoId === jogoId &&
+      b.condutorId === AppState.user.id
+  );
 }
