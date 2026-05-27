@@ -213,7 +213,7 @@ async function fakeNetworkDelay() {
 }
 
 /* API CALL */
-const API_BASE = window.OS_BEIROES_API_BASE || localStorage.getItem('osbeiroes_api_base') || 'https://api.osbeiroes.cc';
+const API_BASE = window.OS_BEIROES_API_BASE || localStorage.getItem('osbeiroes_api_base') || 'http://localhost:8080';//|| 'https://api.osbeiroes.cc';
 
 function apiEndpoint(endpoint) {
   return endpoint;
@@ -1346,20 +1346,18 @@ function renderBoleiasList() {
   // O utilizador já é condutor neste jogo?
   const jaECondutor = bs.some(b => b.condutorId === uid);
 
-  // Mostrar/esconder o botão "Oferecer Boleia" consoante o estado
+  // Bloquear o botão "Oferecer Boleia" se o utilizador já é condutor
+  // ou se já tem um lugar reservado noutra boleia deste jogo
   const btnOferecer = $('btnOferecer');
   if (btnOferecer) {
-    if (jaTemReserva) {
-      btnOferecer.disabled = true;
-      btnOferecer.title = 'Já tens um lugar reservado numa boleia para este jogo.';
-      btnOferecer.style.opacity = '0.45';
-      btnOferecer.style.cursor = 'not-allowed';
-    } else {
-      btnOferecer.disabled = false;
-      btnOferecer.title = '';
-      btnOferecer.style.opacity = '';
-      btnOferecer.style.cursor = '';
-    }
+    const bloqueado = jaTemReserva || jaECondutor;
+    const motivo = jaECondutor
+      ? 'Já ofereceste boleia para este jogo.'
+      : 'Já tens um lugar reservado numa boleia para este jogo.';
+    btnOferecer.disabled = bloqueado;
+    btnOferecer.title = bloqueado ? motivo : '';
+    btnOferecer.style.opacity = bloqueado ? '0.45' : '';
+    btnOferecer.style.cursor = bloqueado ? 'not-allowed' : '';
   }
 
   let html = '';
